@@ -24,7 +24,7 @@ def dibujar_juego(pantalla, recursos, estado):
         # Dibujar base
         _dibujar_elementos_base(pantalla, recursos, estado)
         # Título fijo
-        pantalla.blit(recursos["titulo"], (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
+        pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2), int(recursos["titulo"].get_height() * 0.2))), (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
 
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
@@ -68,7 +68,7 @@ def _dibujar_inicio(pantalla, recursos):
     """Dibuja el título gigante y el texto parpadeante."""
     # Título Grande
     img_t = recursos["titulo"]
-    escala = 2.5
+    escala = 0.5
     nw = int(img_t.get_width() * escala)
     nh = int(img_t.get_height() * escala)
     img_grande = pygame.transform.smoothscale(img_t, (nw, nh))
@@ -96,7 +96,7 @@ def _dibujar_intro(pantalla, recursos, estado):
 
     # B. Título moviéndose
     img_t = recursos["titulo"]
-    escala = 2.5 + (1.0 - 2.5) * suavizado
+    escala = 0.5 + (0.2 - 0.5) * suavizado
     nw = int(img_t.get_width() * escala)
     nh = int(img_t.get_height() * escala)
     img_anim = pygame.transform.smoothscale(img_t, (nw, nh))
@@ -104,8 +104,8 @@ def _dibujar_intro(pantalla, recursos, estado):
     # Interpolación de posición
     xi, yi = CENTRO_PANTALLA
     # Centro destino: Posición final + mitad del tamaño de la imagen original
-    xf = POS_TITULO_FINAL_X + img_t.get_width() // 2
-    yf = POS_TITULO_FINAL_Y + img_t.get_height() // 2
+    xf = POS_TITULO_FINAL_X + (img_t.get_width())*0.2 // 2
+    yf = POS_TITULO_FINAL_Y + (img_t.get_height())*0.2 // 2
 
     cur_x = xi + (xf - xi) * suavizado
     cur_y = yi + (yf - yi) * suavizado

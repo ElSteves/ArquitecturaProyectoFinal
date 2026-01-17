@@ -8,7 +8,7 @@ ALTO_VENTANA = 720
 CARPETA_IMAGENES = "assets"
 
 # --- COLORES ---
-COLOR_FONDO = (107, 102, 128)  # Púrpura pizarra
+COLOR_FONDO = (74, 67, 95)  # Púrpura pizarra
 COLOR_BOTON = (0, 150, 0)
 COLOR_BOTON_HOVER = (0, 200, 0)
 COLOR_TEXTO = (255, 255, 255)

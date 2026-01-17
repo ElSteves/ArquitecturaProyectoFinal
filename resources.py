@@ -33,8 +33,8 @@ def cargar_recursos():
         recursos["puntero"] = pygame.transform.scale(img_puntero_orig, (nw, nh))
 
         # --- FUENTES ---
-        recursos["fuente_boton"] = pygame.font.SysFont("Arial", 24, bold=True)
-        recursos["fuente_aviso"] = pygame.font.SysFont("Arial", 30, bold=False)
+        recursos["fuente_boton"] = pygame.font.SysFont("Montserrat", 24, bold=True)
+        recursos["fuente_aviso"] = pygame.font.SysFont("Montserrat", 30, bold=False)
 
     except FileNotFoundError as e:
         print(f"Error cargando recursos: {e}")
