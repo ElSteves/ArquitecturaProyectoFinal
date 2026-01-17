@@ -5,7 +5,6 @@ import sys
 pygame.init()
 
 # --- CONFIGURACIÓN GENERAL ---
-# Cambiamos la resolución base a 1920x1080 como pediste
 ANCHO_VENTANA = 1080
 ALTO_VENTANA = 720
 COLOR_FONDO = (30, 30, 30)
@@ -13,8 +12,6 @@ COLOR_BOTON = (0, 150, 0)
 COLOR_BOTON_HOVER = (0, 200, 0)
 COLOR_TEXTO = (255, 255, 255)
 
-# Usamos SCALED para que si la pantalla no soporta 1920x1080 (o por la barra de tareas),
-# pygame intente ajustarlo mejor, aunque lo ideal es que tu monitor sea de esta resolución.
 pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA), pygame.RESIZABLE)
 
 pygame.display.set_caption("Simulación: Cuello de Botella (1920x1080)")
@@ -38,16 +35,13 @@ except FileNotFoundError as e:
     sys.exit()
 
 # --- POSICIONAMIENTO FIJO ---
-# Al usar ANCHO_VENTANA // 2, la imagen siempre se irá al centro real, sin importar el tamaño.
 rect_centro = img_centro.get_rect()
 rect_centro.center = (ANCHO_VENTANA // 2, ALTO_VENTANA // 2)
 
-# El título lo movemos un poco para que no quede tan pegado a la esquina en una pantalla grande
 posicion_titulo = (50, 50)
 
-# --- AJUSTES RELATIVOS (Esto es clave para que no se rompa la animación) ---
-# Como estos cálculos dependen de 'rect_centro', se moverán automáticamente junto con la imagen central.
-AJUSTE_RELOJ_X = 252
+# --- AJUSTES RELATIVOS ---
+AJUSTE_RELOJ_X = 255
 AJUSTE_RELOJ_Y = 48
 centro_fijo_puntero = (rect_centro.x + AJUSTE_RELOJ_X, rect_centro.y + AJUSTE_RELOJ_Y)
 
@@ -57,7 +51,6 @@ posicion_waiting = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAI
 
 # --- CONFIGURACIÓN DEL BOTÓN ---
 boton_rect = pygame.Rect(0, 0, 150, 50)
-# Lo anclamos al centro horizontal y un poco arriba del borde inferior
 boton_rect.center = (ANCHO_VENTANA // 2, ALTO_VENTANA - 100)
 
 texto_boton = fuente.render("INICIAR", True, COLOR_TEXTO)
@@ -74,9 +67,10 @@ dato_y = altura_cable_y
 enviando_dato = False
 velocidad_dato = 5
 
-# --- VARIABLES DEL RELOJ ---
-angulo = 0
-velocidad_rotacion = 2
+# --- VARIABLES DEL RELOJ (MODIFICADO) ---
+# He puesto 45 grados para intentar que apunte hacia arriba (ajústalo si es necesario).
+# Antes esto cambiaba, ahora se queda fijo.
+angulo_fijo = 45
 
 # --- BUCLE PRINCIPAL ---
 corriendo = True
@@ -99,10 +93,9 @@ while corriendo:
                     enviando_dato = True
                     dato_x = inicio_cable_x
 
-    # 1. Lógica del Reloj
-    angulo -= velocidad_rotacion
-    if angulo <= -360: angulo = 0
-    img_puntero_rotada = pygame.transform.rotate(img_puntero, angulo)
+    # 1. Lógica del Reloj (SIMPLIFICADA)
+    # Ya no restamos velocidad, simplemente aplicamos el ángulo fijo.
+    img_puntero_rotada = pygame.transform.rotate(img_puntero, angulo_fijo)
     rect_puntero_rotado = img_puntero_rotada.get_rect(center=centro_fijo_puntero)
 
     # 2. Lógica del Dato
@@ -112,7 +105,7 @@ while corriendo:
             dato_x = fin_cable_x
             enviando_dato = False
 
-            # --- DIBUJADO ---
+    # --- DIBUJADO ---
     pantalla.fill(COLOR_FONDO)
 
     pantalla.blit(img_centro, rect_centro)
