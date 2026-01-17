@@ -1,7 +1,7 @@
 import pygame
 import math
 from config import *
-
+#wasa
 
 def dibujar_juego(pantalla, recursos, estado):
     """Función maestra de dibujado."""

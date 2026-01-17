@@ -1,5 +1,5 @@
 import os
-
+#wasa
 # --- DIMENSIONES ---
 ANCHO_VENTANA = 1080
 ALTO_VENTANA = 720

@@ -4,7 +4,7 @@ from config import *
 import resources
 import graphics
 
-
+#wasa
 def main():
     pygame.init()
     pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA), pygame.RESIZABLE)
