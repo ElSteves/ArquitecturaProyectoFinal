@@ -1,6 +1,7 @@
 import pygame
 import sys
-import math  # Importamos math para el efecto de parpadeo suave
+import math
+import os  # <--- IMPORTANTE: Necesario para navegar entre carpetas
 
 # 1. Inicializar Pygame
 pygame.init()
@@ -8,19 +9,26 @@ pygame.init()
 # --- CONFIGURACIÓN GENERAL ---
 ANCHO_VENTANA = 1080
 ALTO_VENTANA = 720
-COLOR_FONDO = (30, 30, 30)
+
+# Color de fondo (Púrpura pizarra)
+COLOR_FONDO = (107, 102, 128)
+
 COLOR_BOTON = (0, 150, 0)
 COLOR_BOTON_HOVER = (0, 200, 0)
 COLOR_TEXTO = (255, 255, 255)
-COLOR_TEXTO_ENTER = (200, 200, 200)  # Un blanco un poco gris para el texto de abajo
+COLOR_TEXTO_ENTER = (200, 200, 200)
 
 pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA), pygame.RESIZABLE)
 
 pygame.display.set_caption("Simulación: Cuello de Botella (1920x1080)")
 fuente = pygame.font.SysFont("Arial", 24, bold=True)
-fuente_aviso = pygame.font.SysFont("Arial", 30, bold=False)  # Fuente para "Presione Enter"
+fuente_aviso = pygame.font.SysFont("Arial", 30, bold=False)
 
-# --- CARGAR IMÁGENES ---
+# --- CARGAR IMÁGENES DESDE CARPETA ---
+# Definimos el nombre de la carpeta donde pusiste las imágenes
+CARPETA_IMAGENES = "assets"
+
+# Nombres de los archivos
 nombre_imagen_centro = "CPU- RAM-CLOCK.png"
 nombre_imagen_titulo = "Titulo.png"
 nombre_imagen_puntero = "imgCLOCK-puntero_base.png"
@@ -28,13 +36,33 @@ nombre_imagen_dato = "Bit brillando.png"
 nombre_imagen_waiting = "waiting-text.png"
 
 try:
-    img_centro = pygame.image.load(nombre_imagen_centro)
-    img_titulo = pygame.image.load(nombre_imagen_titulo)
-    img_puntero = pygame.image.load(nombre_imagen_puntero)
-    img_dato = pygame.image.load(nombre_imagen_dato)
-    img_waiting = pygame.image.load(nombre_imagen_waiting)
+    # Usamos os.path.join para construir la ruta: "assets/archivo.png"
+    ruta_centro = os.path.join(CARPETA_IMAGENES, nombre_imagen_centro)
+    img_centro = pygame.image.load(ruta_centro)
+
+    ruta_titulo = os.path.join(CARPETA_IMAGENES, nombre_imagen_titulo)
+    img_titulo = pygame.image.load(ruta_titulo)
+
+    ruta_dato = os.path.join(CARPETA_IMAGENES, nombre_imagen_dato)
+    img_dato = pygame.image.load(ruta_dato)
+
+    ruta_waiting = os.path.join(CARPETA_IMAGENES, nombre_imagen_waiting)
+    img_waiting = pygame.image.load(ruta_waiting)
+
+    # --- AJUSTE DEL PUNTERO ---
+    ruta_puntero = os.path.join(CARPETA_IMAGENES, nombre_imagen_puntero)
+    img_puntero_original = pygame.image.load(ruta_puntero)
+
+    # Factor de escala: 0.6 (60%)
+    FACTOR_ESCALA_PUNTERO = 0.6
+
+    nuevo_ancho_p = int(img_puntero_original.get_width() * FACTOR_ESCALA_PUNTERO)
+    nuevo_alto_p = int(img_puntero_original.get_height() * FACTOR_ESCALA_PUNTERO)
+    img_puntero = pygame.transform.scale(img_puntero_original, (nuevo_ancho_p, nuevo_alto_p))
+
 except FileNotFoundError as e:
     print(f"Error al cargar imagen: {e}")
+    print(f"Asegúrate de que la carpeta '{CARPETA_IMAGENES}' exista y tenga las imágenes dentro.")
     sys.exit()
 
 # --- POSICIONAMIENTO FIJO ---
@@ -42,10 +70,10 @@ rect_centro = img_centro.get_rect()
 rect_centro.center = (ANCHO_VENTANA // 2, ALTO_VENTANA // 2)
 
 # --- CONFIGURACIÓN INTRO Y ESTADOS ---
-pantalla_inicio = True  # Estado 1: Pantalla de "Presione Enter"
-intro_activa = False  # Estado 2: Animación de movimiento
+pantalla_inicio = True
+intro_activa = False
 tiempo_inicio_intro = 0
-DURACION_INTRO = 2500  # AUMENTADO: 5 segundos para que sea más lento y suave
+DURACION_INTRO = 2000  # 2 segundos
 
 # Posición final del título
 pos_titulo_final_x = 50
@@ -89,6 +117,7 @@ def dibujar_elementos_juego(superficie):
     if enviando_dato:
         superficie.blit(img_waiting, posicion_waiting)
 
+    # Dibujamos el puntero (que ahora es más pequeño)
     img_puntero_rotada = pygame.transform.rotate(img_puntero, angulo_fijo)
     rect_puntero_rotado = img_puntero_rotada.get_rect(center=centro_fijo_puntero)
     superficie.blit(img_puntero_rotada, rect_puntero_rotado)
@@ -118,20 +147,18 @@ while corriendo:
             if evento.key == pygame.K_ESCAPE:
                 corriendo = False
 
-            # Si estamos en la pantalla de inicio y presionan ENTER
+            # ENTER para iniciar
             if evento.key == pygame.K_RETURN:
                 if pantalla_inicio:
                     pantalla_inicio = False
                     intro_activa = True
-                    # Importante: reiniciamos el tiempo justo ahora para que la intro empiece desde 0
                     tiempo_inicio_intro = pygame.time.get_ticks()
 
-            # Saltar intro con ESPACIO (opcional)
+            # ESPACIO para saltar intro
             if evento.key == pygame.K_SPACE and intro_activa:
                 intro_activa = False
 
         if evento.type == pygame.MOUSEBUTTONDOWN:
-            # Solo permitimos clic si YA PASÓ la intro y la pantalla de inicio
             if not pantalla_inicio and not intro_activa:
                 if boton_rect.collidepoint(mouse_pos):
                     if not enviando_dato:
@@ -150,7 +177,6 @@ while corriendo:
 
     # ESTADO 1: PANTALLA DE INICIO
     if pantalla_inicio:
-        # 1. Título Gigante en el centro (Escala 3.0 igual que el inicio de la animación)
         escala_inicio = 2.5
         ancho_t = int(img_titulo.get_width() * escala_inicio)
         alto_t = int(img_titulo.get_height() * escala_inicio)
@@ -158,13 +184,12 @@ while corriendo:
         rect_titulo_grande = titulo_grande.get_rect(center=(ANCHO_VENTANA // 2, ALTO_VENTANA // 2))
         pantalla.blit(titulo_grande, rect_titulo_grande)
 
-        # 2. Texto "Presione ENTER" con parpadeo suave
-        # Usamos seno del tiempo para oscilar alpha
+        # Texto parpadeante
         tiempo = pygame.time.get_ticks()
-        alpha_texto = int(abs(math.sin(tiempo / 500)) * 255)  # Oscila cada 0.5s aprox
+        alpha_texto = int(abs(math.sin(tiempo / 500)) * 255)
 
         texto_enter = fuente_aviso.render("Presione ENTER para iniciar el programa", True, COLOR_TEXTO_ENTER)
-        texto_enter.set_alpha(alpha_texto)  # Aplicamos transparencia
+        texto_enter.set_alpha(alpha_texto)
 
         rect_enter = texto_enter.get_rect(center=(ANCHO_VENTANA // 2, ALTO_VENTANA // 2 + 150))
         pantalla.blit(texto_enter, rect_enter)
@@ -176,18 +201,18 @@ while corriendo:
 
         if progreso >= 1.0:
             progreso = 1.0
-            intro_activa = False  # Fin de la intro
+            intro_activa = False
 
-        suavizado = 1 - pow(1 - progreso, 3)  # Cubic Ease Out
+        suavizado = 1 - pow(1 - progreso, 3)
 
-        # A. Elementos del juego apareciendo lentamente (Fade In)
+        # Fade In del juego
         capa_juego = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
         dibujar_elementos_juego(capa_juego)
         alpha_actual = int(255 * suavizado)
         capa_juego.set_alpha(alpha_actual)
         pantalla.blit(capa_juego, (0, 0))
 
-        # B. Título moviéndose y achicándose
+        # Movimiento del Título
         escala_inicial = 2.5
         escala_final = 1.0
         escala_actual = escala_inicial + (escala_final - escala_inicial) * suavizado
@@ -196,7 +221,6 @@ while corriendo:
         alto_t = int(img_titulo.get_height() * escala_actual)
         titulo_animado = pygame.transform.smoothscale(img_titulo, (ancho_t, alto_t))
 
-        # Posiciones
         x_inicio = ANCHO_VENTANA // 2
         y_inicio = ALTO_VENTANA // 2
         x_fin = pos_titulo_final_x + img_titulo.get_width() // 2
@@ -208,7 +232,7 @@ while corriendo:
         rect_animado = titulo_animado.get_rect(center=(int(x_actual), int(y_actual)))
         pantalla.blit(titulo_animado, rect_animado)
 
-    # ESTADO 3: PROGRAMA NORMAL
+    # ESTADO 3: JUEGO NORMAL
     else:
         dibujar_elementos_juego(pantalla)
         pantalla.blit(img_titulo, (pos_titulo_final_x, pos_titulo_final_y))
