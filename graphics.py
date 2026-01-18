@@ -1,9 +1,10 @@
 import pygame
 import math
+import random
 from config import *
 #wasa
 
-def dibujar_juego(pantalla, recursos, estado):
+def dibujar_juego(pantalla, recursos, estado, bits,  bit_reloj):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -17,26 +18,26 @@ def dibujar_juego(pantalla, recursos, estado):
 
     # --- CASO 2: ANIMACIÓN INTRO ---
     elif intro_activa:
-        _dibujar_intro(pantalla, recursos, estado)
+        _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj)
 
     # --- CASO 3: SIMULACIÓN NORMAL ---
     else:
         # Dibujar base
-        _dibujar_elementos_base(pantalla, recursos, estado)
+        _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj)
         # Título fijo
         pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2), int(recursos["titulo"].get_height() * 0.2))), (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
 
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
 
-def _dibujar_elementos_base(superficie, recursos, estado):
+def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
     """Dibuja CPU, Reloj, Botón y Dato (Lo común)."""
     # 1. Placa central
     rect_centro = recursos["centro"].get_rect(center=CENTRO_PANTALLA)
     superficie.blit(recursos["centro"], rect_centro)
 
     # 2. Texto de pantalla cpu 
-    # if estado["enviando_dato"] :
+    # if bits["enviando"] :
     #     pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
     if estado["waiting"]:
         pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
@@ -49,15 +50,29 @@ def _dibujar_elementos_base(superficie, recursos, estado):
         superficie.blit(recursos["exec"], pos_e)
 
     # 3. Puntero Reloj
-    img_rotada = pygame.transform.rotate(recursos["puntero"], ANGULO_FIJO_RELOJ)
+    angulo = -45 if bit_reloj["estado"] == True else 90 
+    img_rotada = pygame.transform.rotate(recursos["puntero"], angulo)
     pos_puntero = (rect_centro.x + AJUSTE_RELOJ_X, rect_centro.y + AJUSTE_RELOJ_Y)
     rect_rotado = img_rotada.get_rect(center=pos_puntero)
     superficie.blit(img_rotada, rect_rotado)
 
     # 4. El Dato (Bit)
-    if estado["enviando_dato"]:
+
+    if bits["enviando"]:
         offset = recursos["dato"].get_height() // 2
-        superficie.blit(recursos["dato"], (estado["dato_x"], estado["dato_y"] - offset))
+        for i in range(8):
+            if bits["activo"][i]:
+                superficie.blit(recursos["dato"], (bits["x"], bits["y"][i] - offset))
+
+
+    # Bit del rejol 
+    if bit_reloj["enviando"]:
+        offset= recursos["dato"].get_height() //2
+        superficie.blit(recursos["dato"], 
+                        (bit_reloj["x_d"]-25, bit_reloj["y_d"]-offset))
+        superficie.blit(recursos["dato"], 
+                        (bit_reloj["x_i"]-25, bit_reloj["y_i"]-offset))
+   
 
     # 5. Botón
     boton_rect = estado["boton_rect"]
@@ -91,14 +106,14 @@ def _dibujar_inicio(pantalla, recursos):
     pantalla.blit(txt_enter, rect_enter)
 
 
-def _dibujar_intro(pantalla, recursos, estado):
+def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj):
     """Calcula las interpolaciones de la intro."""
     progreso = estado["intro_progreso"]
     suavizado = 1 - pow(1 - progreso, 3)
 
     # A. Elementos base apareciendo (Fade In)
     capa = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
-    _dibujar_elementos_base(capa, recursos, estado)
+    _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj)
     capa.set_alpha(int(255 * suavizado))
     pantalla.blit(capa, (0, 0))
 
