@@ -7,35 +7,53 @@ from config import *
 import resources
 import graphics
 
+## SIMULACION, PARÁMETROS Y MÉTODOS 
+class Simulacion:
+    def __init__(self, inx, finx, frecuenciaCPU, latenciaRAM):
+        ## Parametros Simulacion
+        self.frecuenciaCPU = frecuenciaCPU #hz
+        self.latenciaRAM = latenciaRAM #segundos
+        self.periodo_CPU= 1/frecuenciaCPU #s
+
+        ## Parametros para animaciones 
+        # Distancias
+        self.distancia_RAM = 190
+        self.distancia_CPU = 261
+        self.inx = inx
+        self.finx = finx
+        self.pixelsPorSeg = (60*self.periodo_CPU/self.frecuenciaCPU)
+        self.velBitRelojRAM = int(self.distancia_RAM/self.pixelsPorSeg)
+        self.velBitRelojCPU = int(self.distancia_CPU/self.pixelsPorSeg)
+
+    ## Se debe llamar con un hilo, demora la ejecucion de la simulación el tiempo de latencia 
+    def proceso_RAM(self, bits, estado):
+        self.transportar_bit(bits, 0)
+        time.sleep(TIEMPO_DATO) #segundos
+        print("esperando ram")
+        
+        time.sleep(self.latenciaRAM)
+        print("Fin de la espera devolviendo datos")
+        
+        self.transportar_bit(bits, 1)
+        time.sleep(TIEMPO_DATO)
+
+        estado["waiting"] = False
+
+    #configura los bits para envio o captación de datos 
+    # 0 hacia derecha
+    # 1 hacia izquierda 
+    def transportar_bit(self, bits, direccion=0):
+        bits["enviando"] = True
+        bits["x"] = self.finx if direccion else self.inx
+        bits["direccion"] = direccion
+        bits_activos = []
+        for i in range(8):
+            valor_aleatorio = random.choice([True, False])
+            bits_activos.append(valor_aleatorio)
+        bits["activo"] = bits_activos
+
+
 # FUNCIONES UTILITARIAS 
-
-#configura los bits para envio o captación de datos 
-# 0 hacia derecha
-# 1 hacia izquierda 
-def direccion_dato(bits, inx, finx, direccion=0):
-    bits["enviando"] = True
-    bits["x"] = finx if direccion else inx
-    bits["direccion"] = direccion
-    bits_activos = []
-    for i in range(8):
-        valor_aleatorio = random.choice([True, False])
-        bits_activos.append(valor_aleatorio)
-    bits["activo"] = bits_activos
-
-def proceso_RAM(bits, inx, finx, estado):
-    direccion_dato(bits, inx, finx, 0)
-    time.sleep(TIEMPO_DATO)
-    print("esperando ram")
-    
-    time.sleep(2)
-    print("Fin de la espera devolviendo datos")
-    
-    direccion_dato(bits, inx, finx, 1)
-    time.sleep(TIEMPO_DATO)
-
-    estado["waiting"] = False
-
-
 # Inicia un cronómetro 
 class relojInterno:
     def __init__(self):
@@ -48,10 +66,6 @@ class relojInterno:
     def obtenerTiempoActual(self):
         self.tiempo_actual = pygame.time.get_ticks()
         return (self.tiempo_actual - self.tiempo_inicial) / 1000
-    
-
-
-
 
 #wasa
 def main():
@@ -151,30 +165,30 @@ def main():
                         if not simulacion: 
                             simulacion = True
                             reloj_interno.iniciarReloj()
+                            ## AQUI SE DEBE INICIALIZAR LOS VALORES PARA LA SIMULACION 
+                            frecuencia = 2 #en ciclos por segundo 
+                            latencia = 2 #en segundos
+                            program_counter = 0
+                            sim = Simulacion(inicio_cable_x, fin_cable_x, frecuencia, latencia)
                         
-
-                            
-
-
         # B. LÓGICA / ACTUALIZACIÓN
 
         ## Simulacion 
         
         if simulacion:
             program_counter = 0
-            # cronometro  
+            
+            ### Tiempo de simulación 
             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
-            txt_tiempo = assets["fuente_aviso"].render(
-                f"Tiempo Reloj: {tiempo_actual_seg:.0f} s \n Ciclos: {ciclos_totales}", 
-                True, COLOR_TEXTO
-            ) 
 
-            # ciclos por segundo 
-            ciclos_actuales = int(tiempo_actual_seg / PERIODO_RELOJ)
+            ### Ciclos transcurridos
+            ciclos_actuales = int(tiempo_actual_seg /sim.periodo_CPU)
 
             if ciclos_actuales > ultimo_ciclo_procesado:
                 ultimo_ciclo_procesado = ciclos_actuales
                 ciclos_totales +=1
+
+                # Iniciar animación bits rejol 
                 if not bit_reloj["enviando"]:
                     bit_reloj["x_d"] = 600
                     bit_reloj["y_d"] = 230
@@ -182,18 +196,14 @@ def main():
                     bit_reloj["y_i"] = 230
                     bit_reloj["enviando"] = True
 
-                
-                # direccion_dato(bits, inicio_cable_x, fin_cable_x, direccion=random.randint(0,1))
-                
+                ## ACCIONES EN CADA CICLO 
                 if not estado["waiting"] : 
                     estado["waiting"]= True
                     hilo = threading.Thread(
-                        target=proceso_RAM, 
-                        args=(bits, inicio_cable_x, fin_cable_x, estado),
+                        target=sim.proceso_RAM, 
+                        args=(bits, estado),
                         daemon=True)
                     hilo.start()
-            
-            
 
             if reloj_interno.obtenerTiempoActual() > 10:
                 simulacion = False
@@ -202,6 +212,13 @@ def main():
                 ciclos_actuales = 0
                 ciclos_totales = 0
                 ultimo_ciclo_procesado = 0
+
+            ### RENDERIZAR VALORES ### 
+            #renderzar tiempo y ciclos 
+            txt_tiempo = assets["fuente_aviso"].render(
+                f"Tiempo Reloj: {tiempo_actual_seg:.0f} s \n Ciclos: {ciclos_totales}", 
+                True, COLOR_TEXTO
+            ) 
 
         # Lógica de la Intro
         if estado["intro_activa"]:
@@ -231,28 +248,28 @@ def main():
             bit_reloj["estado"] = True
             ##derecha
             if bit_reloj["y_d"] == 230 and bit_reloj["x_d"] < 640:
-                bit_reloj["x_d"] += V_BIT_RELOJ_DERECHA
+                bit_reloj["x_d"] += sim.velBitRelojRAM
                 if bit_reloj["x_d"] > 640:
                     bit_reloj["x_d"] = 640
 
             if bit_reloj["x_d"] == 640 and bit_reloj["y_d"] < 340:
-                bit_reloj["y_d"] += V_BIT_RELOJ_DERECHA
+                bit_reloj["y_d"] += sim.velBitRelojRAM
                 if bit_reloj["y_d"] > 340:
                     bit_reloj["y_d"] = 340
                     
             if bit_reloj["y_d"] == 340 and bit_reloj["x_d"] < 680:
-                bit_reloj["x_d"] += V_BIT_RELOJ_DERECHA
+                bit_reloj["x_d"] += sim.velBitRelojRAM
                 if bit_reloj["x_d"] > 680:
                     bit_reloj["x_d"] = 680
                     
 
             ##izquierda 
             if (bit_reloj["y_i"] == 230 and bit_reloj["x_i"] >355):
-                bit_reloj["x_i"] -= V_BIT_RELOJ_IZQUIERDA
+                bit_reloj["x_i"] -= sim.velBitRelojCPU
                 if bit_reloj["x_i"] < 355:
                     bit_reloj["x_i"] = 355
             if (bit_reloj["x_i"] == 355 and bit_reloj["y_i"] < 316):
-                bit_reloj["y_i"] += V_BIT_RELOJ_IZQUIERDA
+                bit_reloj["y_i"] += sim.velBitRelojCPU
                 if bit_reloj["y_i"] > 316:
                     bit_reloj["y_i"] = 316
                     bit_reloj["enviando"] = False
