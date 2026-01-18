@@ -14,7 +14,9 @@ def cargar_recursos():
         "titulo": "Titulo.png",
         "puntero": "imgCLOCK-puntero_base.png",
         "dato": "Bit brillando.png",
-        "waiting": "waiting-text.png"
+        "waiting": "waiting-text.png",
+        "fetch": "fetch-text.png",
+        "exec": "exec-text.png"
     }
 
     try:

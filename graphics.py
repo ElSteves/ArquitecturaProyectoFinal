@@ -35,10 +35,18 @@ def _dibujar_elementos_base(superficie, recursos, estado):
     rect_centro = recursos["centro"].get_rect(center=CENTRO_PANTALLA)
     superficie.blit(recursos["centro"], rect_centro)
 
-    # 2. Waiting text
-    if estado["enviando_dato"]:
+    # 2. Texto de pantalla cpu 
+    # if estado["enviando_dato"] :
+    #     pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
+    if estado["waiting"]:
         pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
         superficie.blit(recursos["waiting"], pos_w)
+    if estado["fetching"]:
+        pos_f = (rect_centro.x + AJUSTE_FETCH_X, rect_centro.y + AJUSTE_FETCH_Y)
+        superficie.blit(recursos["fetch"], pos_f)
+    if estado["exec"]:
+        pos_e = (rect_centro.x + AJUSTE_EXEC_X, rect_centro.y + AJUSTE_EXEC_Y)
+        superficie.blit(recursos["exec"], pos_e)
 
     # 3. Puntero Reloj
     img_rotada = pygame.transform.rotate(recursos["puntero"], ANGULO_FIJO_RELOJ)
