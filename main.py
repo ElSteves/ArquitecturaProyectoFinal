@@ -14,6 +14,11 @@ class Simulacion:
         self.frecuenciaCPU = frecuenciaCPU #hz
         self.latenciaRAM = latenciaRAM #segundos
         self.periodo_CPU= 1/frecuenciaCPU #s
+        self.program_couter = 1
+        self.out = 0
+        self.simulando = True
+        self.tiempo_ocio = 0.0
+        self.eficiencia = 0.0
 
         ## Parametros para animaciones 
         # Distancias
@@ -25,19 +30,121 @@ class Simulacion:
         self.velBitRelojRAM = int(self.distancia_RAM/self.pixelsPorSeg)
         self.velBitRelojCPU = int(self.distancia_CPU/self.pixelsPorSeg)
 
+    # Obtener stats 
+    def obtener_estadisticas(self, tiempo_total_sim): 
+        aux = tiempo_total_sim - self.tiempo_ocio
+        self.eficiencia = (aux / tiempo_total_sim) * 100
+        return self.eficiencia, self.tiempo_ocio
+
+
     ## Se debe llamar con un hilo, demora la ejecucion de la simulación el tiempo de latencia 
     def proceso_RAM(self, bits, estado):
+        estado["fetching"], estado["waiting"], estado["exec"] = False, True, False
+        
         self.transportar_bit(bits, 0)
         time.sleep(TIEMPO_DATO) #segundos
-        print("esperando ram")
-        
+
+        inicio_espera = time.time()
+        # RAM espera en base a su latencia
         time.sleep(self.latenciaRAM)
-        print("Fin de la espera devolviendo datos")
+        self.tiempo_ocio+=(time.time() - inicio_espera)
+        
         
         self.transportar_bit(bits, 1)
+
         time.sleep(TIEMPO_DATO)
 
-        estado["waiting"] = False
+        estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+
+    ## Se tarda por ciclos en funcion de la instruccion a ser ejecutada 
+    def proceso_CPU (self, bits, estado): 
+        estado["ejecutando..."] = True
+        #FETCH: Pedir instruccion 
+        estado["fetching"], estado["waiting"], estado["exec"] = True, False, False
+        time.sleep(self.periodo_CPU) #Demora 1 ciclo 
+        self.proceso_RAM(bits, estado) #Pide instruccion 
+        time.sleep(TIEMPO_DATO) 
+
+        #EXCEC- PC: Program Counter
+        match self.program_couter:
+            # LOAD  10
+            case 1: #
+                self.proceso_RAM(bits, estado) #pide dato de la direccion 10
+                # LLeva el dato al acumulador - 1 ciclo 
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                self.program_couter += 1
+            # ADD 11 
+            case 2: 
+                self.proceso_RAM(bits, estado) #pide dato de la direccion 11
+                # Lleva el dato al registro y lo suma en la ALU (2 ciclos )
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU*2)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                self.program_couter += 1
+            # STORE 10
+            case 3: 
+                # Guarda lo que hay en el acumulador en la dir 10 
+                self.transportar_bit(bits, 0)
+                time.sleep(TIEMPO_DATO) #segundos
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                time.sleep(self.latenciaRAM)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                self.program_couter += 1
+            # OUT 10 
+            case 4:
+                # Envía instrucción a la ram
+                self.transportar_bit(bits, 0)
+                time.sleep(TIEMPO_DATO) #segundos
+                time.sleep(self.latenciaRAM)
+                # RAM responde al dispositivo de salida
+                ### FALTA IMPLEMENTAR 
+                self.out += 1
+                self.program_couter += 1
+            # SUB 12
+            case 5:
+                self.proceso_RAM(bits, estado) #pide dato de la direccion 12 (limite del contador )
+                # LLeva el dato al registro y lo resta en la ALU - 2 ciclos
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU*2)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                self.program_couter += 1
+            # JNZ 01
+            case 6: 
+                ### Demora un ciclo en comprobar si el contador llebo al limite 
+                #La actualizacion del contador se lo hace en el bucle principal 
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU)
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
+                
+                if self.out < LIMIT_COUNTER :
+                    self.program_couter = 1
+                elif self.out >= LIMIT_COUNTER: 
+                    self.program_couter = 7
+
+
+            # HALT
+            case 7: 
+                ### Demora un ciclo en terminal el programa 
+                #La finalizacion del programa se lo hace en el bucle principal 
+                estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
+                time.sleep(self.periodo_CPU)
+                self.simulando = False
+                
+
+        estado["ejecutando..."] = False 
+
+
+                
+
+
+            
+
+
+
 
     #configura los bits para envio o captación de datos 
     # 0 hacia derecha
@@ -78,6 +185,8 @@ def main():
     simulacion = False
     hilo_iniciado = False 
     txt_tiempo = None
+    txt_out = None
+    txt_estadisticas = None
     reloj_interno = relojInterno()
     ciclos_totales= 0
     ultimo_ciclo_procesado = 0
@@ -97,7 +206,8 @@ def main():
         "boton_rect": pygame.Rect(0, 0, 150, 50),
         "waiting": False,
         "fetching": False,
-        "exec": False
+        "exec": False,
+        "ejecutando...": False
     }
 
     # Coordenadas de los cables para la lógica
@@ -163,21 +273,25 @@ def main():
                 if not estado["pantalla_inicio"] and not estado["intro_activa"]:
                     if estado["boton_rect"].collidepoint(mouse_pos):
                         if not simulacion: 
-                            simulacion = True
-                            reloj_interno.iniciarReloj()
+                            ## Reestablecer valres de simulaciones anteriores 
+                            bits["enviando"] = False
+                            bit_reloj["enviando"] = False
+                            ciclos_actuales = 0
+                            ciclos_totales = 0
+                            ultimo_ciclo_procesado = 0
                             ## AQUI SE DEBE INICIALIZAR LOS VALORES PARA LA SIMULACION 
+                            reloj_interno.iniciarReloj() # Temporizador 
                             frecuencia = 2 #en ciclos por segundo 
-                            latencia = 2 #en segundos
-                            program_counter = 0
+                            latencia = 0 #en segundos
                             sim = Simulacion(inicio_cable_x, fin_cable_x, frecuencia, latencia)
+                            simulacion = sim.simulando
+                            
                         
         # B. LÓGICA / ACTUALIZACIÓN
 
         ## Simulacion 
         
         if simulacion:
-            program_counter = 0
-            
             ### Tiempo de simulación 
             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
 
@@ -197,28 +311,32 @@ def main():
                     bit_reloj["enviando"] = True
 
                 ## ACCIONES EN CADA CICLO 
-                if not estado["waiting"] : 
-                    estado["waiting"]= True
+                if not estado["ejecutando..."]: 
                     hilo = threading.Thread(
-                        target=sim.proceso_RAM, 
+                        target=sim.proceso_CPU, 
                         args=(bits, estado),
                         daemon=True)
                     hilo.start()
 
-            if reloj_interno.obtenerTiempoActual() > 10:
-                simulacion = False
-                bits["enviando"] = False
-                bit_reloj["enviando"] = False
-                ciclos_actuales = 0
-                ciclos_totales = 0
-                ultimo_ciclo_procesado = 0
-
             ### RENDERIZAR VALORES ### 
             #renderzar tiempo y ciclos 
             txt_tiempo = assets["fuente_aviso"].render(
-                f"Tiempo Reloj: {tiempo_actual_seg:.0f} s \n Ciclos: {ciclos_totales}", 
+                f"Tiempo Reloj: {tiempo_actual_seg:.00f} s Ciclos: {ciclos_totales}", 
                 True, COLOR_TEXTO
             ) 
+            txt_out = assets["fuente_aviso"].render(
+                f"OUTPUT: {sim.out}, PC: {sim.program_couter}",
+                True, COLOR_TEXTO
+            )
+            
+
+            simulacion = sim.simulando
+            if simulacion == False :
+                eficiencia, tiempo_ocio = sim.obtener_estadisticas(tiempo_actual_seg)
+                txt_estadisticas = assets["fuente_aviso"].render(
+                f"Eficiencia: {eficiencia:.00f}%, Ocio: {tiempo_ocio:.00f} s",
+                True, COLOR_TEXTO
+            )
 
         # Lógica de la Intro
         if estado["intro_activa"]:
@@ -280,8 +398,13 @@ def main():
 
         # C. DIBUJADO (Delegado al módulo graphics)
         graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj)
+        ## Info simulacion solo para pruebas 
         if txt_tiempo != None: 
             pantalla.blit(txt_tiempo, (10, 200))
+        if txt_out != None: 
+            pantalla.blit(txt_out, (10, 300))
+        if txt_estadisticas != None:
+            pantalla.blit(txt_estadisticas, (10, 400))
         pygame.display.flip()
         clock.tick(60)
 
