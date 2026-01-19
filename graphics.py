@@ -2,9 +2,11 @@ import pygame
 import math
 import random
 from config import *
-#wasa
 
-def dibujar_juego(pantalla, recursos, estado, bits,  bit_reloj):
+
+# wasa
+
+def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -18,14 +20,22 @@ def dibujar_juego(pantalla, recursos, estado, bits,  bit_reloj):
 
     # --- CASO 2: ANIMACIÓN INTRO ---
     elif intro_activa:
-        _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj)
+        _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia, slider_latencia)
 
     # --- CASO 3: SIMULACIÓN NORMAL ---
     else:
         # Dibujar base
         _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj)
         # Título fijo
-        pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2), int(recursos["titulo"].get_height() * 0.2))), (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
+        pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2),
+                                                                        int(recursos["titulo"].get_height() * 0.2))),
+                      (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
+
+        # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
+        if slider_frecuencia and slider_latencia:
+            disabled = estado.get("simulacion", False)
+            slider_frecuencia.dibujar(pantalla, recursos["fuente_aviso"], disabled=disabled)
+            slider_latencia.dibujar(pantalla, recursos["fuente_aviso"], disabled=disabled)
 
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
@@ -36,7 +46,7 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
     rect_centro = recursos["centro"].get_rect(center=CENTRO_PANTALLA)
     superficie.blit(recursos["centro"], rect_centro)
 
-    # 2. Texto de pantalla cpu 
+    # 2. Texto de pantalla cpu
     # if bits["enviando"] :
     #     pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
     if estado["waiting"]:
@@ -50,7 +60,7 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
         superficie.blit(recursos["exec"], pos_e)
 
     # 3. Puntero Reloj
-    angulo = -45 if bit_reloj["estado"] == True else 90 
+    angulo = -45 if bit_reloj["estado"] == True else 90
     img_rotada = pygame.transform.rotate(recursos["puntero"], angulo)
     pos_puntero = (rect_centro.x + AJUSTE_RELOJ_X, rect_centro.y + AJUSTE_RELOJ_Y)
     rect_rotado = img_rotada.get_rect(center=pos_puntero)
@@ -64,27 +74,63 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
             if bits["activo"][i]:
                 superficie.blit(recursos["dato"], (bits["x"], bits["y"][i] - offset))
 
-
-    # Bit del rejol 
+    # Bit del rejol
     if bit_reloj["enviando"]:
-        offset= recursos["dato"].get_height() //2
-        superficie.blit(recursos["dato"], 
-                        (bit_reloj["x_d"]-25, bit_reloj["y_d"]-offset))
-        superficie.blit(recursos["dato"], 
-                        (bit_reloj["x_i"]-25, bit_reloj["y_i"]-offset))
-   
+        offset = recursos["dato"].get_height() // 2
+        superficie.blit(recursos["dato"],
+                        (bit_reloj["x_d"] - 25, bit_reloj["y_d"] - offset))
+        superficie.blit(recursos["dato"],
+                        (bit_reloj["x_i"] - 25, bit_reloj["y_i"] - offset))
 
-    # 5. Botón
+    # 5. Botón Iniciar con animación
     boton_rect = estado["boton_rect"]
     mouse_pos = pygame.mouse.get_pos()
     color = COLOR_BOTON_HOVER if boton_rect.collidepoint(mouse_pos) else COLOR_BOTON
 
-    pygame.draw.rect(superficie, color, boton_rect, border_radius=10)
+    # Aplicar escala de animación al botón Iniciar
+    tamaño_boton = estado.get("tamaño_boton_actual", 1.0)
+    ancho_animado = int(boton_rect.width * tamaño_boton)
+    alto_animado = int(boton_rect.height * tamaño_boton)
+    offset_x = (boton_rect.width - ancho_animado) // 2
+    offset_y = (boton_rect.height - alto_animado) // 2
+
+    rect_boton_animado = pygame.Rect(
+        boton_rect.x + offset_x,
+        boton_rect.y + offset_y,
+        ancho_animado,
+        alto_animado
+    )
+
+    pygame.draw.rect(superficie, color, rect_boton_animado, border_radius=10)
 
     # Texto del botón
     txt = recursos["fuente_boton"].render("INICIAR", True, COLOR_TEXTO)
-    txt_rect = txt.get_rect(center=boton_rect.center)
+    txt_rect = txt.get_rect(center=rect_boton_animado.center)
     superficie.blit(txt, txt_rect)
+
+    # 6. Botón Parar con animación
+    boton_parar_rect = estado.get("boton_parar_rect")
+    if boton_parar_rect:
+        color_parar = (200, 50, 50) if boton_parar_rect.collidepoint(mouse_pos) else (150, 30, 30)
+
+        # Aplicar escala de animación al botón Parar
+        tamaño_parar = estado.get("tamaño_parar_actual", 1.0)
+        ancho_parar_animado = int(boton_parar_rect.width * tamaño_parar)
+        alto_parar_animado = int(boton_parar_rect.height * tamaño_parar)
+        offset_parar_x = (boton_parar_rect.width - ancho_parar_animado) // 2
+        offset_parar_y = (boton_parar_rect.height - alto_parar_animado) // 2
+
+        rect_parar_animado = pygame.Rect(
+            boton_parar_rect.x + offset_parar_x,
+            boton_parar_rect.y + offset_parar_y,
+            ancho_parar_animado,
+            alto_parar_animado
+        )
+
+        pygame.draw.rect(superficie, color_parar, rect_parar_animado, border_radius=10)
+        txt_parar = recursos["fuente_boton"].render("PARAR", True, COLOR_TEXTO)
+        txt_parar_rect = txt_parar.get_rect(center=rect_parar_animado.center)
+        superficie.blit(txt_parar, txt_parar_rect)
 
 
 def _dibujar_inicio(pantalla, recursos):
@@ -106,7 +152,7 @@ def _dibujar_inicio(pantalla, recursos):
     pantalla.blit(txt_enter, rect_enter)
 
 
-def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj):
+def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None):
     """Calcula las interpolaciones de la intro."""
     progreso = estado["intro_progreso"]
     suavizado = 1 - pow(1 - progreso, 3)
@@ -116,6 +162,15 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj):
     _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj)
     capa.set_alpha(int(255 * suavizado))
     pantalla.blit(capa, (0, 0))
+
+    # Sliders con fade in
+    if slider_frecuencia and slider_latencia:
+        capa_sliders = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
+        # En la intro siempre están activos (no deshabilitados)
+        slider_frecuencia.dibujar(capa_sliders, recursos["fuente_aviso"], disabled=False)
+        slider_latencia.dibujar(capa_sliders, recursos["fuente_aviso"], disabled=False)
+        capa_sliders.set_alpha(int(255 * suavizado))
+        pantalla.blit(capa_sliders, (0, 0))
 
     # B. Título moviéndose
     img_t = recursos["titulo"]
@@ -127,8 +182,8 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj):
     # Interpolación de posición
     xi, yi = CENTRO_PANTALLA
     # Centro destino: Posición final + mitad del tamaño de la imagen original
-    xf = POS_TITULO_FINAL_X + (img_t.get_width())*0.2 // 2
-    yf = POS_TITULO_FINAL_Y + (img_t.get_height())*0.2 // 2
+    xf = POS_TITULO_FINAL_X + (img_t.get_width()) * 0.2 // 2
+    yf = POS_TITULO_FINAL_Y + (img_t.get_height()) * 0.2 // 2
 
     cur_x = xi + (xf - xi) * suavizado
     cur_y = yi + (yf - yi) * suavizado
