@@ -200,6 +200,7 @@ def main():
         "exec": False,
         "ejecutando...": False,
         "simulacion": False,
+        "pc_visual": 1.0,  # Posición visual suavizada del Program Counter
         # Animación de botones
         "tamaño_boton_actual": 1.0,
         "tamaño_boton_objetivo": 1.0,
@@ -327,6 +328,11 @@ def main():
         diferencia_parar = estado["tamaño_parar_objetivo"] - estado["tamaño_parar_actual"]
         estado["tamaño_parar_actual"] += diferencia_parar * 0.50
 
+        # Actualizar posición visual del PC (interpolación suave)
+        # Si hay simulación, el objetivo es el PC real, si no, vuelve a 1
+        target_pc = sim.program_counter if simulacion else 1
+        estado["pc_visual"] += (target_pc - estado["pc_visual"]) * 0.2
+
         ## Simulacion
 
         if simulacion:
@@ -431,7 +437,7 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, sim.program_counter if simulacion else 1)
+        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"])
         ## Info simulacion solo para pruebas
         if txt_tiempo != None:
             pantalla.blit(txt_tiempo, (890, 400))

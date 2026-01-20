@@ -32,7 +32,7 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simula
         resalte_y = resalte_y_inicio + (program_counter - 1) * espaciado_entre_pasos
         
         # Crear rectángulo de resalte
-        rect_resalte = pygame.Rect(resalte_x, resalte_y, resalte_ancho, resalte_alto)
+        rect_resalte = pygame.Rect(resalte_x, int(resalte_y), resalte_ancho, resalte_alto)
         
         # Dibujar rectángulo verde semitransparente
         superficie_resalte = pygame.Surface((resalte_ancho, resalte_alto))
