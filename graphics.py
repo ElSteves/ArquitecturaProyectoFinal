@@ -198,6 +198,7 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuenci
     # A. Elementos base apareciendo (Fade In)
     capa = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
     _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj)
+    _dibujar_tabla_program_counter(capa, recursos, 1, False)
     capa.set_alpha(int(255 * suavizado))
     pantalla.blit(capa, (0, 0))
 
