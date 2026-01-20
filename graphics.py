@@ -50,7 +50,7 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, highli
         superficie.blit(superficie_resalte, rect_resalte)
 
 
-def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1):
+def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1, tiempo=0, ciclos=0):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -77,6 +77,9 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
         # Dibujar tabla del Program Counter
         _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("pc_highlight_scale", 0.0))
+
+        # Dibujar HUD de estadísticas (Nuevo UI)
+        _dibujar_estadisticas(pantalla, recursos, tiempo, ciclos)
 
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
@@ -237,3 +240,51 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuenci
     cur_y = yi + (yf - yi) * suavizado
 
     pantalla.blit(img_anim, img_anim.get_rect(center=(int(cur_x), int(cur_y))))
+
+
+def _dibujar_estadisticas(superficie, recursos, tiempo, ciclos):
+    """Dibuja el HUD de estadísticas con estilo de tarjetas en la esquina superior derecha."""
+    # Configuración de estilo
+    ancho_tarjeta = 130
+    alto_tarjeta = 60  # Aumentado para fuente más grande
+    margen_derecho = 30
+    margen_superior = 30
+    espacio_entre = 15
+    offset_etiqueta = 25  # Espacio vertical para el texto arriba
+    color_fondo = (60, 80, 100)  # Gris azulado
+    color_borde = (80, 100, 120) # Borde acorde al fondo
+
+    # Fuentes locales para el HUD
+    fuente_titulo = pygame.font.SysFont("Montserrat", 20, bold=False)
+    fuente_valor = pygame.font.SysFont("Montserrat", 42, bold=True)
+
+    # --- Tarjeta 1: Ciclos (Izquierda) ---
+    x_ciclos = ANCHO_VENTANA - margen_derecho - 2 * ancho_tarjeta - espacio_entre
+    y_burbuja = margen_superior + offset_etiqueta
+    rect_ciclos = pygame.Rect(x_ciclos, y_burbuja, ancho_tarjeta, alto_tarjeta)
+
+    # Etiqueta fuera (arriba)
+    lbl_ciclos = fuente_titulo.render("Ciclos de reloj", True, (180, 180, 190))
+    superficie.blit(lbl_ciclos, lbl_ciclos.get_rect(centerx=rect_ciclos.centerx, bottom=rect_ciclos.top - 5))
+
+    # Burbuja (solo valor)
+    pygame.draw.rect(superficie, color_fondo, rect_ciclos)
+    pygame.draw.rect(superficie, color_borde, rect_ciclos, 2)
+
+    val_ciclos = fuente_valor.render(f"{int(ciclos)}", True, (255, 255, 255))
+    superficie.blit(val_ciclos, val_ciclos.get_rect(center=rect_ciclos.center))
+
+    # --- Tarjeta 2: Tiempo (Derecha) ---
+    x_tiempo = ANCHO_VENTANA - margen_derecho - ancho_tarjeta
+    rect_tiempo = pygame.Rect(x_tiempo, y_burbuja, ancho_tarjeta, alto_tarjeta)
+
+    # Etiqueta fuera (arriba)
+    lbl_tiempo = fuente_titulo.render("Tiempo trans.", True, (180, 180, 190))
+    superficie.blit(lbl_tiempo, lbl_tiempo.get_rect(centerx=rect_tiempo.centerx, bottom=rect_tiempo.top - 5))
+
+    # Burbuja (solo valor)
+    pygame.draw.rect(superficie, color_fondo, rect_tiempo)
+    pygame.draw.rect(superficie, color_borde, rect_tiempo, 2)
+
+    val_tiempo = fuente_valor.render(f"{tiempo:.1f}s", True, (255, 255, 255))
+    superficie.blit(val_tiempo, val_tiempo.get_rect(center=rect_tiempo.center))

@@ -175,7 +175,7 @@ def main():
     # VARIABLES SIMULACION
     simulacion = False
     hilo_iniciado = False
-    txt_tiempo = None
+    tiempo_actual_seg = 0.0
     txt_out = None
     txt_estadisticas = None
     reloj_interno = relojInterno()
@@ -370,10 +370,6 @@ def main():
 
             ### RENDERIZAR VALORES ###
             # renderzar tiempo y ciclos
-            txt_tiempo = assets["fuente_aviso"].render(
-                f"Tiempo Reloj: {tiempo_actual_seg:.00f} s Ciclos: {ciclos_totales}",
-                True, COLOR_TEXTO
-            )
             txt_out = assets["fuente_aviso"].render(
                 f"OUTPUT: {sim.out}, PC: {sim.program_counter}",
                 True, COLOR_TEXTO
@@ -443,10 +439,8 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"])
+        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales)
         ## Info simulacion solo para pruebas
-        if txt_tiempo != None:
-            pantalla.blit(txt_tiempo, (890, 400))
         if txt_out != None:
             pantalla.blit(txt_out, (890, 470))
         if txt_estadisticas != None:
