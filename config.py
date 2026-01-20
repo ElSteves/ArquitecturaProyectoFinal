@@ -8,9 +8,9 @@ ALTO_VENTANA = 720
 CARPETA_IMAGENES = "assets"
 
 # --- COLORES ---
-COLOR_FONDO = (44, 36, 59)  # Cambiado a la ultima version
-COLOR_BOTON = (0, 150, 0)
-COLOR_BOTON_HOVER = (0, 200, 0)
+COLOR_FONDO = (44, 32, 56)  # Cambiado a la ultima version
+COLOR_BOTON = (3, 128, 116)
+COLOR_BOTON_HOVER = (3, 108, 98)
 COLOR_TEXTO = (255, 255, 255)
 COLOR_TEXTO_ENTER = (200, 200, 200)
 
