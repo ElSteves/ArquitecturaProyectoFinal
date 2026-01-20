@@ -388,3 +388,63 @@ def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo
     fuente_btn = pygame.font.SysFont("Montserrat", 16, bold=True)
     txt_btn = fuente_btn.render("Mostrar más resultados", True, (255, 255, 255))
     superficie.blit(txt_btn, txt_btn.get_rect(center=rect_anim.center))
+
+
+def dibujar_ventana_resultados(pantalla, recursos, estado, historial):
+    """Dibuja el overlay con la gráfica de rendimiento."""
+    # 1. Fondo semitransparente
+    overlay = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA))
+    overlay.set_alpha(220)
+    overlay.fill((20, 20, 30))
+    pantalla.blit(overlay, (0, 0))
+
+    # 2. Contenedor de la gráfica
+    margen_x = 100
+    margen_y = 100
+    ancho_graph = ANCHO_VENTANA - 2 * margen_x
+    alto_graph = ALTO_VENTANA - 2 * margen_y
+    
+    rect_graph = pygame.Rect(margen_x, margen_y, ancho_graph, alto_graph)
+    pygame.draw.rect(pantalla, (40, 40, 50), rect_graph, border_radius=15)
+    pygame.draw.rect(pantalla, (100, 100, 120), rect_graph, 2, border_radius=15)
+
+    # Título de la gráfica
+    fuente_titulo = pygame.font.SysFont("Montserrat", 28, bold=True)
+    txt_titulo = fuente_titulo.render("Monitor de Actividad CPU (Tiempo Real)", True, (255, 255, 255))
+    pantalla.blit(txt_titulo, txt_titulo.get_rect(center=(ANCHO_VENTANA // 2, margen_y + 40)))
+
+    # 3. Dibujar Gráfica (Barras)
+    if len(historial) > 0:
+        # Área útil para las barras
+        area_barras = pygame.Rect(margen_x + 30, margen_y + 80, ancho_graph - 60, alto_graph - 160)
+        # pygame.draw.rect(pantalla, (0, 0, 0), area_barras) # Debug fondo barras
+
+        ancho_barra = area_barras.width / 200  # 200 es el maxlen del deque
+        
+        for i, valor in enumerate(historial):
+            # 1 = Activo (Verde, Alto), 0 = Espera (Rojo, Bajo)
+            es_activo = (valor == 1)
+            
+            color = (0, 255, 100) if es_activo else (255, 50, 50)
+            altura = area_barras.height * 0.8 if es_activo else area_barras.height * 0.15
+            
+            x = area_barras.x + i * ancho_barra
+            y = area_barras.bottom - altura
+            
+            # Dibujar barra (con un pequeño espacio entre ellas si el ancho lo permite)
+            ancho_dibujo = max(1, ancho_barra - 1)
+            pygame.draw.rect(pantalla, color, (x, y, ancho_dibujo, altura))
+
+    # 4. Botón Cerrar
+    rect_cerrar = estado["boton_cerrar_resultados_rect"]
+    # Aseguramos que esté posicionado visualmente donde queremos (abajo centro del modal)
+    rect_cerrar.center = (ANCHO_VENTANA // 2, margen_y + alto_graph - 50)
+    
+    mouse_pos = pygame.mouse.get_pos()
+    color_cerrar = (200, 50, 50) if rect_cerrar.collidepoint(mouse_pos) else (150, 30, 30)
+    
+    pygame.draw.rect(pantalla, color_cerrar, rect_cerrar, border_radius=10)
+    pygame.draw.rect(pantalla, (255, 255, 255), rect_cerrar, 2, border_radius=10)
+    
+    txt_cerrar = recursos["fuente_boton"].render("CERRAR", True, (255, 255, 255))
+    pantalla.blit(txt_cerrar, txt_cerrar.get_rect(center=rect_cerrar.center))

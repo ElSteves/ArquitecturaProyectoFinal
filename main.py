@@ -1,4 +1,5 @@
 import pygame
+from collections import deque
 import sys
 import random
 import threading
@@ -224,7 +225,11 @@ def main():
         "boton_ff_rect": pygame.Rect(0, 0, 50, 50),
         "ff_activo": False,
         "tamaño_ff_actual": 1.0,
-        "tamaño_ff_objetivo": 1.0
+        "tamaño_ff_objetivo": 1.0,
+        # Monitor de Recursos (Overlay)
+        "mostrando_resultados": False,
+        "historial_actividad": deque(maxlen=200),
+        "boton_cerrar_resultados_rect": pygame.Rect(0, 0, 150, 50)
     }
 
     # Crear sliders para frecuencia y latencia
@@ -272,6 +277,10 @@ def main():
     # Ubicar botón FF (Centro)
     estado["boton_ff_rect"].center = (ANCHO_VENTANA // 2, ALTO_VENTANA - 100)
 
+    # Ubicar botón Cerrar Resultados (Centro de la ventana modal)
+    # Se ajustará visualmente en graphics, pero definimos el área de colisión aquí
+    estado["boton_cerrar_resultados_rect"].center = (ANCHO_VENTANA // 2, ALTO_VENTANA - 100)
+
     # --- BUCLE PRINCIPAL ---
     corriendo = True
     while corriendo:
@@ -299,6 +308,13 @@ def main():
                 # Saltar Intro
                 if evento.key == pygame.K_SPACE and estado["intro_activa"]:
                     estado["intro_activa"] = False
+
+            # Eventos específicos del Overlay de Resultados
+            if estado["mostrando_resultados"]:
+                if evento.type == pygame.MOUSEBUTTONDOWN:
+                    if estado["boton_cerrar_resultados_rect"].collidepoint(mouse_pos):
+                        estado["mostrando_resultados"] = False
+                continue  # Si estamos mostrando resultados, no procesar el resto de eventos del juego
 
             # Manejar eventos de sliders
             if not estado["pantalla_inicio"] and not estado["intro_activa"] and not simulacion:
@@ -346,6 +362,7 @@ def main():
                     # Botón Mostrar más resultados (Solo animación por ahora)
                     if estado.get("mostrar_stats") and estado["boton_resultados_rect"].collidepoint(mouse_pos):
                         estado["tamaño_resultados_objetivo"] = 0.9
+                        estado["mostrando_resultados"] = True
 
             # Restaurar tamaño de botones cuando se suelta el mouse
             if evento.type == pygame.MOUSEBUTTONUP:
@@ -389,6 +406,12 @@ def main():
             # Aplicar escala a la simulación y al reloj
             sim.time_scale = scale
             reloj_interno.actualizar(dt_s, scale)
+
+            # Registrar actividad para la gráfica (1 = Procesando, 0 = Esperando)
+            # Si waiting es True, es 0 (Rojo). Si no, asumimos procesando (Verde).
+            es_espera = estado.get("waiting", False)
+            valor_actividad = 0 if es_espera else 1
+            estado["historial_actividad"].append(valor_actividad)
 
             ### Tiempo de simulación
             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
@@ -484,7 +507,11 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales, eficiencia=eficiencia_final, tiempo_ocio=tiempo_ocio_final)
+        if estado["mostrando_resultados"]:
+            graphics.dibujar_ventana_resultados(pantalla, assets, estado, estado["historial_actividad"])
+        else:
+            graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales, eficiencia=eficiencia_final, tiempo_ocio=tiempo_ocio_final)
+        
         ## Info simulacion solo para pruebas
         if txt_out != None:
             pantalla.blit(txt_out, (890, 470))
