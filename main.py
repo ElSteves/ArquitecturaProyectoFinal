@@ -16,7 +16,7 @@ class Simulacion:
         self.frecuenciaCPU = frecuenciaCPU  # hz
         self.latenciaRAM = latenciaRAM  # segundos
         self.periodo_CPU = 1 / frecuenciaCPU  # s
-        self.program_couter = 1
+        self.program_counter = 1
         self.out = 0
         self.simulando = True
         self.tiempo_ocio = 0.0
@@ -66,7 +66,7 @@ class Simulacion:
         time.sleep(TIEMPO_DATO)
 
         # EXCEC- PC: Program Counter
-        match self.program_couter:
+        match self.program_counter:
             # LOAD  10
             case 1:  #
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 10
@@ -74,7 +74,7 @@ class Simulacion:
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
                 time.sleep(self.periodo_CPU)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
-                self.program_couter += 1
+                self.program_counter += 1
             # ADD 11
             case 2:
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 11
@@ -82,7 +82,7 @@ class Simulacion:
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
                 time.sleep(self.periodo_CPU * 2)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
-                self.program_couter += 1
+                self.program_counter += 1
             # STORE 10
             case 3:
                 # Guarda lo que hay en el acumulador en la dir 10
@@ -93,7 +93,7 @@ class Simulacion:
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
                 time.sleep(self.latenciaRAM)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
-                self.program_couter += 1
+                self.program_counter += 1
             # OUT 10
             case 4:
                 # Envía instrucción a la ram
@@ -103,7 +103,7 @@ class Simulacion:
                 # RAM responde al dispositivo de salida
                 ### FALTA IMPLEMENTAR
                 self.out += 1
-                self.program_couter += 1
+                self.program_counter += 1
             # SUB 12
             case 5:
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 12 (limite del contador )
@@ -111,7 +111,7 @@ class Simulacion:
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
                 time.sleep(self.periodo_CPU * 2)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
-                self.program_couter += 1
+                self.program_counter += 1
             # JNZ 01
             case 6:
                 ### Demora un ciclo en comprobar si el contador llebo al limite
@@ -121,9 +121,9 @@ class Simulacion:
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
 
                 if self.out < LIMIT_COUNTER:
-                    self.program_couter = 1
+                    self.program_counter = 1
                 elif self.out >= LIMIT_COUNTER:
-                    self.program_couter = 7
+                    self.program_counter = 7
 
             # HALT
             case 7:
@@ -208,11 +208,11 @@ def main():
     }
 
     # Crear sliders para frecuencia y latencia
-    slider_frecuencia = Slider(820, 200, 200, 50, 1, 10, 2, "Frecuencia (Hz)", (100, 200, 255))
-    slider_latencia = Slider(820, 300, 200, 50, 0, 10, 0, "Latencia (s)", (255, 150, 100))
+    slider_frecuencia = Slider(950, 200, 200, 50, 1, 10, 2, "Frecuencia (Hz)", (100, 200, 255))
+    slider_latencia = Slider(950, 300, 200, 50, 0, 10, 0, "Latencia (s)", (255, 150, 100))
 
     # Coordenadas de los cables para la lógica
-    inicio_cable_x = rect_centro.left + 140
+    inicio_cable_x = rect_centro.left + 135
     fin_cable_x = rect_centro.right - 100
 
     distancia_primer_bit = rect_centro.center[1] + OFFSET_Y_CABLE - 24
@@ -342,9 +342,9 @@ def main():
 
                 # Iniciar animación bits rejol
                 if not bit_reloj["enviando"]:
-                    bit_reloj["x_d"] = 600
+                    bit_reloj["x_d"] = 660
                     bit_reloj["y_d"] = 230
-                    bit_reloj["x_i"] = 530
+                    bit_reloj["x_i"] = 610
                     bit_reloj["y_i"] = 230
                     bit_reloj["enviando"] = True
 
@@ -363,7 +363,7 @@ def main():
                 True, COLOR_TEXTO
             )
             txt_out = assets["fuente_aviso"].render(
-                f"OUTPUT: {sim.out}, PC: {sim.program_couter}",
+                f"OUTPUT: {sim.out}, PC: {sim.program_counter}",
                 True, COLOR_TEXTO
             )
 
@@ -403,27 +403,27 @@ def main():
         if bit_reloj["enviando"]:
             bit_reloj["estado"] = True
             ##derecha
-            if bit_reloj["y_d"] == 230 and bit_reloj["x_d"] < 640:
+            if bit_reloj["y_d"] == 230 and bit_reloj["x_d"] < 705:
                 bit_reloj["x_d"] += sim.velBitRelojRAM
-                if bit_reloj["x_d"] > 640:
-                    bit_reloj["x_d"] = 640
+                if bit_reloj["x_d"] > 705:
+                    bit_reloj["x_d"] = 705
 
-            if bit_reloj["x_d"] == 640 and bit_reloj["y_d"] < 340:
+            if bit_reloj["x_d"] == 705 and bit_reloj["y_d"] < 340:
                 bit_reloj["y_d"] += sim.velBitRelojRAM
                 if bit_reloj["y_d"] > 340:
                     bit_reloj["y_d"] = 340
 
-            if bit_reloj["y_d"] == 340 and bit_reloj["x_d"] < 680:
+            if bit_reloj["y_d"] == 340 and bit_reloj["x_d"] < 735:
                 bit_reloj["x_d"] += sim.velBitRelojRAM
-                if bit_reloj["x_d"] > 680:
-                    bit_reloj["x_d"] = 680
+                if bit_reloj["x_d"] > 735:
+                    bit_reloj["x_d"] = 735
 
             ##izquierda
-            if (bit_reloj["y_i"] == 230 and bit_reloj["x_i"] > 355):
+            if (bit_reloj["y_i"] == 230 and bit_reloj["x_i"] > 420):
                 bit_reloj["x_i"] -= sim.velBitRelojCPU
-                if bit_reloj["x_i"] < 355:
-                    bit_reloj["x_i"] = 355
-            if (bit_reloj["x_i"] == 355 and bit_reloj["y_i"] < 316):
+                if bit_reloj["x_i"] < 420:
+                    bit_reloj["x_i"] = 420
+            if (bit_reloj["x_i"] == 420 and bit_reloj["y_i"] < 316):
                 bit_reloj["y_i"] += sim.velBitRelojCPU
                 if bit_reloj["y_i"] > 316:
                     bit_reloj["y_i"] = 316
@@ -431,14 +431,14 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia)
+        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, sim.program_counter if simulacion else 1)
         ## Info simulacion solo para pruebas
         if txt_tiempo != None:
-            pantalla.blit(txt_tiempo, (10, 200))
+            pantalla.blit(txt_tiempo, (890, 400))
         if txt_out != None:
-            pantalla.blit(txt_out, (10, 300))
+            pantalla.blit(txt_out, (890, 470))
         if txt_estadisticas != None:
-            pantalla.blit(txt_estadisticas, (10, 400))
+            pantalla.blit(txt_estadisticas, (890, 540))
         pygame.display.flip()
         clock.tick(60)
 

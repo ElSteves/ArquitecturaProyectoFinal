@@ -1,7 +1,7 @@
 import os
 #wasa
 # --- DIMENSIONES ---
-ANCHO_VENTANA = 1080
+ANCHO_VENTANA = 1200
 ALTO_VENTANA = 720
 
 # --- RUTAS ---
@@ -40,7 +40,7 @@ VELOCIDAD_DATO = 10
 TIEMPO_DATO = DISTANCIA_BUS/(60*VELOCIDAD_DATO) 
 
 ## OTROS 
-LIMIT_COUNTER = 1
+LIMIT_COUNTER = 1  # Aumentar esto para ver el bucle en acción
 # reloj
 # ANGULO_FIJO_RELOJ = 45
 # FRECUENCIA_RELOJ = 2

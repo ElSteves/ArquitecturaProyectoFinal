@@ -16,7 +16,8 @@ def cargar_recursos():
         "dato": "Bit brillando.png",
         "waiting": "waiting-text.png",
         "fetch": "fetch-text.png",
-        "exec": "exec-text.png"
+        "exec": "exec-text.png",
+        "tabla": "table.png"
     }
 
     try:

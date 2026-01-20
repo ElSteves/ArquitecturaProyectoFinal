@@ -4,9 +4,44 @@ import random
 from config import *
 
 
-# wasa
+def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simulacion_activa=False):
+    """Dibuja la tabla del program counter y resalta el paso actual en verde solo si la simulación está activa."""
+    # Posición inicial de la tabla
+    tabla_x = 48
+    tabla_y = 210
+    
+    # Redimensionar la tabla
+    tabla_original = recursos["tabla"]
+    ancho_nuevo = 280
+    alto_nuevo = 310
+    tabla_redimensionada = pygame.transform.scale(tabla_original, (ancho_nuevo, alto_nuevo))
+    
+    # Dibujar imagen de la tabla redimensionada
+    superficie.blit(tabla_redimensionada, (tabla_x, tabla_y))
+    
+    # Resaltar el paso actual en verde SOLO si la simulación está activa
+    if simulacion_activa and 1 <= program_counter <= 7:
+        # Parámetros del resalte (ajustados para la tabla redimensionada)
+        resalte_x = tabla_x + 8            # Posición X relativa al inicio de la tabla
+        resalte_ancho = 262                 # Ancho del rectángulo de resalte
+        resalte_alto = 32                  # Alto del rectángulo de resalte
+        espaciado_entre_pasos = 33         # Distancia vertical entre cada paso
+        resalte_y_inicio = tabla_y + 63    # Posición Y del primer paso
+        
+        # Calcular Y según el paso actual
+        resalte_y = resalte_y_inicio + (program_counter - 1) * espaciado_entre_pasos
+        
+        # Crear rectángulo de resalte
+        rect_resalte = pygame.Rect(resalte_x, resalte_y, resalte_ancho, resalte_alto)
+        
+        # Dibujar rectángulo verde semitransparente
+        superficie_resalte = pygame.Surface((resalte_ancho, resalte_alto))
+        superficie_resalte.set_alpha(120)  # Transparencia: 0-255 (120 = semi-transparente)
+        superficie_resalte.fill((0, 255, 0))  # Verde
+        superficie.blit(superficie_resalte, rect_resalte)
 
-def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None):
+
+def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -30,6 +65,9 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
         pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2),
                                                                         int(recursos["titulo"].get_height() * 0.2))),
                       (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
+
+        # Dibujar tabla del Program Counter
+        _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("simulacion", False))
 
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
