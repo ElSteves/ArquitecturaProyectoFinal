@@ -38,6 +38,7 @@ def cargar_recursos():
         # --- FUENTES ---
         recursos["fuente_boton"] = pygame.font.SysFont("Montserrat", 24, bold=True)
         recursos["fuente_aviso"] = pygame.font.SysFont("Montserrat", 30, bold=False)
+        recursos["fuente_retro"] = pygame.font.Font("assets/Minecraft.ttf", 120)
 
     except FileNotFoundError as e:
         print(f"Error cargando recursos: {e}")

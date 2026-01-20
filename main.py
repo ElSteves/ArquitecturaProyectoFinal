@@ -31,8 +31,8 @@ class Simulacion:
         self.inx = inx
         self.finx = finx
         frames_por_ciclo = 60 / self.frecuenciaCPU
-        self.velBitRelojRAM = self.distancia_RAM / frames_por_ciclo
-        self.velBitRelojCPU = self.distancia_CPU / frames_por_ciclo
+        self.velBitRelojRAM = (self.distancia_RAM / frames_por_ciclo)*1.2 # para que llegue ligeramente más rápido
+        self.velBitRelojCPU = (self.distancia_CPU / frames_por_ciclo) *1.2
 
     # Obtener stats
     def obtener_estadisticas(self, tiempo_total_sim):
@@ -51,14 +51,15 @@ class Simulacion:
             t_fin = time.perf_counter()
             dt_real = t_fin - t_inicio
             tiempo_acumulado_sim += dt_real * self.time_scale
+    
 
     ## Se debe llamar con un hilo, demora la ejecucion de la simulación el tiempo de latencia
     def proceso_RAM(self, bits, estado):
         estado["fetching"], estado["waiting"], estado["exec"] = False, True, False
 
         self.transportar_bit(bits, 0)
-        self._esperar(TIEMPO_DATO)  # segundos
-
+        self._esperar(TIEMPO_DATO)
+        self.tiempo_ocio += TIEMPO_DATO*0.1  # segundos
         inicio_espera = time.time()
         # RAM espera en base a su latencia
         self._esperar(self.latenciaRAM)
@@ -68,6 +69,7 @@ class Simulacion:
         self.transportar_bit(bits, 1)
 
         self._esperar(TIEMPO_DATO)
+        self.tiempo_ocio += TIEMPO_DATO*0.1
 
         estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
 
@@ -79,6 +81,8 @@ class Simulacion:
         self._esperar(self.periodo_CPU)  # Demora 1 ciclo
         self.proceso_RAM(bits, estado)  # Pide instruccion
         self._esperar(TIEMPO_DATO)
+        self.tiempo_ocio += TIEMPO_DATO*0.1
+        
 
         # EXCEC- PC: Program Counter
         match self.program_counter:
@@ -102,7 +106,8 @@ class Simulacion:
             case 3:
                 # Guarda lo que hay en el acumulador en la dir 10
                 self.transportar_bit(bits, 0)
-                self._esperar(TIEMPO_DATO)  # segundos
+                self._esperar(TIEMPO_DATO)
+                self.tiempo_ocio += TIEMPO_DATO*0.1  # segundos
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
                 self._esperar(self.periodo_CPU)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
@@ -113,7 +118,8 @@ class Simulacion:
             case 4:
                 # Envía instrucción a la ram
                 self.transportar_bit(bits, 0)
-                self._esperar(TIEMPO_DATO)  # segundos
+                self._esperar(TIEMPO_DATO)
+                self.tiempo_ocio += TIEMPO_DATO*0.1  # segundos
                 self._esperar(self.latenciaRAM)
                 # RAM responde al dispositivo de salida
                 ### FALTA IMPLEMENTAR
@@ -231,15 +237,16 @@ def main():
     simulacion = False
     hilo_iniciado = False
     tiempo_actual_seg = 0.0
-    txt_out = None
     eficiencia_final = 0.0
     tiempo_ocio_final = 0.0
     reloj_interno = relojInterno()
     ciclos_totales = 0
     ultimo_ciclo_procesado = 0
+    txt_out = None
 
     # 1. Cargar Recursos
     assets = resources.cargar_recursos()
+
 
     # 2. Definir Estado Inicial
     # Usamos un diccionario para pasar el estado fácilmente al módulo de gráficos
@@ -282,8 +289,11 @@ def main():
     }
 
     # Crear sliders para frecuencia y latencia
-    slider_frecuencia = Slider(950, 200, 200, 50, 1, 10, 2, "Frecuencia (Hz)", (100, 200, 255))
-    slider_latencia = Slider(950, 300, 200, 50, 0, 10, 0, "Latencia (s)", (255, 150, 100))
+    # slider_frecuencia = Slider(950, 200, 200, 50, 1, 10, 2, "Frecuencia (Hz)", COLOR_SELECTOR_CPU)
+    # slider_latencia = Slider(950, 300, 200, 50, 0, 10, 0, "Latencia (s)", COLOR_SELECTOR_RAM)
+    slider_frecuencia = Slider(910, 160, 200, 50, 1, 10, 2, "Frecuencia (Hz)", COLOR_SELECTOR_CPU)
+    slider_latencia = Slider(910, 220, 200, 50, 0, 10, 0, "Latencia (s)", COLOR_SELECTOR_RAM)
+
 
     # Coordenadas de los cables para la lógica
     inicio_cable_x = rect_centro.left + 135
@@ -496,11 +506,14 @@ def main():
                     hilo.start()
 
             ### RENDERIZAR VALORES ###
-            # renderzar tiempo y ciclos
-            txt_out = assets["fuente_aviso"].render(
-                f"OUTPUT: {sim.out}, PC: {sim.program_counter}",
-                True, COLOR_TEXTO
-            )
+            # renderzar tiempo y ciclo
+
+            # txt_out = graphics.texto_neon(assets["fuente_retro"], f"{sim.program_counter}", 
+            #                 COLOR_TEXTO_OUTPUT, (255,255,255), 0)
+            txt_out = assets["fuente_retro"].render(f"{sim.out}", True, COLOR_TEXTO_OUTPUT)
+            
+
+            
 
             simulacion = sim.simulando
             estado["simulacion"] = simulacion
@@ -570,7 +583,7 @@ def main():
         
         ## Info simulacion solo para pruebas
         if txt_out != None:
-            pantalla.blit(txt_out, (890, 470))
+            pantalla.blit(txt_out, (150, 550))
         pygame.display.flip()
 
     pygame.quit()

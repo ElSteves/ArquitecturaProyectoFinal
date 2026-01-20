@@ -6,7 +6,7 @@ class Slider:
     """Clase para crear sliders interactivos y visuales."""
 
     def __init__(self, x, y, ancho, alto, valor_min, valor_max, valor_inicial, etiqueta,
-                 color_principal=(100, 200, 255)):
+                 color_principal= COLOR_SELECTOR_CPU):
         """
         Crea un slider visual.
 
@@ -29,7 +29,7 @@ class Slider:
         self.valor = valor_inicial
         self.etiqueta = etiqueta
         self.color_principal = color_principal
-        self.color_fondo = (50, 50, 60)
+        self.color_fondo = COLOR_FONDO_SECUNDARIO
         self.color_texto = (255, 255, 255)
 
         # Rects para colisión
@@ -99,6 +99,9 @@ class Slider:
 
         Si `disabled=True`, el slider se dibuja con menor alpha para indicar que no está activo.
         """
+
+        self.ancho +=10
+        self.x -=10
         # Actualizar animación de tamaño
         self._actualizar_animacion_tamaño()
 
@@ -119,7 +122,7 @@ class Slider:
         rango = self.valor_max - self.valor_min
         proporcion = (self.valor - self.valor_min) / rango if rango > 0 else 0
         ancho_progreso = int(self.ancho * proporcion)
-        rect_progreso = pygame.Rect(0, 35, ancho_progreso, 15)
+        rect_progreso = pygame.Rect(0, 35, ancho_progreso+8, 15)
         pygame.draw.rect(surf, self.color_principal, rect_progreso, border_radius=7)
 
         # Botón con animación de tamaño
@@ -159,3 +162,6 @@ class Slider:
 
         # Finalmente, blit en la superficie destino
         superficie.blit(surf, (self.x, self.y))
+
+        self.ancho -=10
+        self.x +=10

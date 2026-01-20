@@ -86,11 +86,12 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
         if estado.get("mostrar_stats", False):
             _dibujar_resultados_finales(pantalla, recursos, estado, eficiencia, tiempo_ocio)
 
+        fuente = pygame.font.SysFont("Montserrat", 20, bold=False)
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
             disabled = estado.get("simulacion", False)
-            slider_frecuencia.dibujar(pantalla, recursos["fuente_aviso"], disabled=disabled)
-            slider_latencia.dibujar(pantalla, recursos["fuente_aviso"], disabled=disabled)
+            slider_frecuencia.dibujar(pantalla, fuente, disabled=disabled)
+            slider_latencia.dibujar(pantalla, fuente, disabled=disabled)
 
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
@@ -169,7 +170,7 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj, frecu
     # 6. Botón Parar con animación
     boton_parar_rect = estado.get("boton_parar_rect")
     if boton_parar_rect:
-        color_parar = (200, 50, 50) if boton_parar_rect.collidepoint(mouse_pos) else (150, 30, 30)
+        color_parar = COLOR_BTN_PARAR_HOVER if boton_parar_rect.collidepoint(mouse_pos) else COLOR_BTN_PARAR
 
         # Aplicar escala de animación al botón Parar
         tamaño_parar = estado.get("tamaño_parar_actual", 1.0)
@@ -198,7 +199,7 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj, frecu
         # Color: Naranja brillante si está activo, naranja oscuro si no
         color_ff = (255, 200, 50) if activo else (200, 140, 20)
         if boton_ff_rect.collidepoint(mouse_pos):
-            color_ff = (255, 220, 80) if activo else (220, 160, 40)
+            color_ff = COLOR_BTN_ADELANTAR_ACTIVE_HOVER if activo else COLOR_BTN_ADELANTAR_ACTIVE
             
         # Animación de escala
         tamaño_ff = estado.get("tamaño_ff_actual", 1.0)
@@ -287,8 +288,8 @@ def _dibujar_estadisticas(superficie, recursos, tiempo, ciclos):
     margen_superior = 30
     espacio_entre = 15
     offset_etiqueta = 25  # Espacio vertical para el texto arriba
-    color_fondo = (60, 80, 100)  # Gris azulado
-    color_borde = (80, 100, 120) # Borde acorde al fondo
+    color_fondo = COLOR_FONDO_SECUNDARIO  # Gris azulado
+    color_borde = COLOR_FONDO_SECUNDARIO # Borde acorde al fondo
 
     # Fuentes locales para el HUD
     fuente_titulo = pygame.font.SysFont("Montserrat", 20, bold=False)
@@ -384,15 +385,15 @@ def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo
 
     # Color e interacción visual
     mouse_pos = pygame.mouse.get_pos()
-    color_base = (139, 0, 139) # Magenta oscuro
-    color_hover = (180, 50, 180)
+    color_base = COLOR_BTN_MOSTRAR_MAS # Magenta oscuro
+    color_hover = COLOR_BTN_MOSTRAR_MAS_HOVER
     color = color_hover if boton_rect.collidepoint(mouse_pos) else color_base
 
     pygame.draw.rect(superficie, color, rect_anim, border_radius=10)
     
     # Texto del botón
     fuente_btn = pygame.font.SysFont("Montserrat", 16, bold=True)
-    txt_btn = fuente_btn.render("Mostrar más resultados", True, (255, 255, 255))
+    txt_btn = fuente_btn.render("   Mostrar más resultados   ", True, (255, 255, 255))
     superficie.blit(txt_btn, txt_btn.get_rect(center=rect_anim.center))
 
 
@@ -495,3 +496,54 @@ def _dibujar_efectos_cpu(superficie, estado, frecuencia):
         rect_calor = surf_calor.get_rect(center=(CENTRO_PANTALLA[0] + ajuste_x, CENTRO_PANTALLA[1] + ajuste_y))
         # Usar BLEND_ADD para efecto de luz/brillo
         superficie.blit(surf_calor, rect_calor, special_flags=pygame.BLEND_ADD)
+
+
+# hacer brillar el texto de output 
+
+def texto_neon(font, text, color_nucleo, color_luz, radius=10):
+    # 1. Renderizar el texto base (del color de la luz)
+    # Este será nuestra base para el desenfoque
+    txt_base = font.render(text, True, color_luz).convert_alpha()
+    w, h = txt_base.get_size()
+    w+=30
+    h+=30
+    
+    # 2. Crear superficies para el efecto Glow (Desenfoque)
+    # Calculamos un tamaño expandido para que el brillo quepa
+    padding = radius * 2
+    glow_surf = pygame.Surface((w + padding, h + padding), pygame.SRCALPHA)
+    
+    # TRUCO: Reducimos drásticamente el texto para "romper" los bordes definidos
+    # Reducir a 1/10 del tamaño original y luego volver a escalar crea un blur natural
+    factor_reduccion = 10 
+    mini_w = max(1, w // factor_reduccion)
+    mini_h = max(1, h // factor_reduccion)
+    
+    # Creamos la versión diminuta
+    txt_mini = pygame.transform.smoothscale(txt_base, (mini_w, mini_h))
+    
+    # Escalamos la versión diminuta al tamaño grande (con el padding extra)
+    # Esto estira los píxeles suavizándolos, creando el efecto "nube" de neón
+    glow_blur = pygame.transform.smoothscale(txt_mini, (w + padding, h + padding))
+    
+    # 3. Dibujar el brillo (puedes ajustar el alpha aquí si es demasiado intenso)
+    # Usamos BLEND_ADD si quieres que brille mucho (como luz real) o normal si prefieres color plano
+    # glow_blur.set_alpha(180) # Descomenta si el brillo es demasiado fuerte
+    
+    # Centramos el brillo en la superficie final
+    resplandor_final = pygame.Surface((w + padding, h + padding), pygame.SRCALPHA)
+    
+    # Dibujamos el brillo un par de veces para intensificar el núcleo sin hacerlo sólido
+    resplandor_final.blit(glow_blur, (0, 0))
+    resplandor_final.blit(glow_blur, (0, 0), special_flags=pygame.BLEND_RGBA_ADD) 
+
+    # 4. Renderizar el Núcleo (el texto blanco/brillante del centro)
+    # Generalmente el centro del neón es casi blanco
+    txt_nucleo = font.render(text, True, color_nucleo).convert_alpha()
+    
+    # Centrar el núcleo sobre el brillo
+    core_x = (resplandor_final.get_width() - txt_nucleo.get_width()) // 2
+    core_y = (resplandor_final.get_height() - txt_nucleo.get_height()) // 2
+    resplandor_final.blit(txt_nucleo, (core_x, core_y))
+    
+    return resplandor_final
