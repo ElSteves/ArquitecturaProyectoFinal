@@ -50,7 +50,7 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, highli
         superficie.blit(superficie_resalte, rect_resalte)
 
 
-def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1, tiempo=0, ciclos=0):
+def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1, tiempo=0, ciclos=0, eficiencia=0, tiempo_ocio=0):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -80,6 +80,10 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
         # Dibujar HUD de estadísticas (Nuevo UI)
         _dibujar_estadisticas(pantalla, recursos, tiempo, ciclos)
+
+        # Dibujar Resultados Finales (Estadísticas y Botón)
+        if estado.get("mostrar_stats", False):
+            _dibujar_resultados_finales(pantalla, recursos, estado, eficiencia, tiempo_ocio)
 
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
@@ -288,3 +292,73 @@ def _dibujar_estadisticas(superficie, recursos, tiempo, ciclos):
 
     val_tiempo = fuente_valor.render(f"{tiempo:.1f}s", True, (255, 255, 255))
     superficie.blit(val_tiempo, val_tiempo.get_rect(center=rect_tiempo.center))
+
+
+def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo_ocio):
+    """Dibuja las estadísticas finales y el botón de más resultados."""
+    # Configuración de posición (alineado a la derecha, bajo sliders)
+    # Sliders están en x=950 con ancho 200 -> borde derecho = 1150
+    x_derecha = 1150
+    y_inicio = 420    # Debajo del segundo slider
+
+    # Fuentes
+    fuente_titulo = pygame.font.SysFont("Montserrat", 20, bold=True)
+    fuente_etiqueta = pygame.font.SysFont("Montserrat", 18, bold=False)
+    fuente_valor = pygame.font.SysFont("Montserrat", 22, bold=True)
+
+    # 1. Título
+    txt_titulo = fuente_titulo.render("Estadísticas Simulación", True, (255, 255, 255))
+    rect_titulo = txt_titulo.get_rect(topright=(x_derecha, y_inicio))
+    superficie.blit(txt_titulo, rect_titulo)
+
+    y_actual = rect_titulo.bottom + 20
+
+    # 2. Eficiencia (Cian)
+    txt_ef_val = fuente_valor.render(f"{eficiencia:.0f}%", True, (0, 255, 255))
+    rect_ef_val = txt_ef_val.get_rect(topright=(x_derecha, y_actual))
+    
+    txt_ef_lbl = fuente_etiqueta.render("Eficiencia:", True, (255, 255, 255))
+    rect_ef_lbl = txt_ef_lbl.get_rect(topright=(rect_ef_val.left - 10, y_actual + 2))
+
+    superficie.blit(txt_ef_val, rect_ef_val)
+    superficie.blit(txt_ef_lbl, rect_ef_lbl)
+
+    y_actual += 30
+
+    # 3. Tiempo de Ocio (Rosa Neón)
+    txt_ocio_val = fuente_valor.render(f"{tiempo_ocio:.0f}s", True, (255, 20, 147))
+    rect_ocio_val = txt_ocio_val.get_rect(topright=(x_derecha, y_actual))
+
+    txt_ocio_lbl = fuente_etiqueta.render("Tiempo de Ocio:", True, (255, 255, 255))
+    rect_ocio_lbl = txt_ocio_lbl.get_rect(topright=(rect_ocio_val.left - 10, y_actual + 2))
+
+    superficie.blit(txt_ocio_val, rect_ocio_val)
+    superficie.blit(txt_ocio_lbl, rect_ocio_lbl)
+
+    y_actual += 50
+
+    # 4. Botón 'Mostrar más resultados'
+    boton_rect = estado["boton_resultados_rect"]
+    # Actualizamos la posición del rect en el estado para que coincida con el dibujo
+    boton_rect.topright = (x_derecha, y_actual)
+    
+    # Animación de escala
+    tamaño = estado.get("tamaño_resultados_actual", 1.0)
+    ancho_anim = int(boton_rect.width * tamaño)
+    alto_anim = int(boton_rect.height * tamaño)
+    
+    rect_anim = pygame.Rect(0, 0, ancho_anim, alto_anim)
+    rect_anim.center = boton_rect.center
+
+    # Color e interacción visual
+    mouse_pos = pygame.mouse.get_pos()
+    color_base = (139, 0, 139) # Magenta oscuro
+    color_hover = (180, 50, 180)
+    color = color_hover if boton_rect.collidepoint(mouse_pos) else color_base
+
+    pygame.draw.rect(superficie, color, rect_anim, border_radius=10)
+    
+    # Texto del botón
+    fuente_btn = pygame.font.SysFont("Montserrat", 16, bold=True)
+    txt_btn = fuente_btn.render("Mostrar más resultados", True, (255, 255, 255))
+    superficie.blit(txt_btn, txt_btn.get_rect(center=rect_anim.center))

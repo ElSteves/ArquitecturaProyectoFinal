@@ -177,7 +177,8 @@ def main():
     hilo_iniciado = False
     tiempo_actual_seg = 0.0
     txt_out = None
-    txt_estadisticas = None
+    eficiencia_final = 0.0
+    tiempo_ocio_final = 0.0
     reloj_interno = relojInterno()
     ciclos_totales = 0
     ultimo_ciclo_procesado = 0
@@ -206,7 +207,12 @@ def main():
         "tamaño_boton_actual": 1.0,
         "tamaño_boton_objetivo": 1.0,
         "tamaño_parar_actual": 1.0,
-        "tamaño_parar_objetivo": 1.0
+        "tamaño_parar_objetivo": 1.0,
+        # Nuevo botón y estadísticas
+        "mostrar_stats": False,
+        "boton_resultados_rect": pygame.Rect(0, 0, 200, 40),
+        "tamaño_resultados_actual": 1.0,
+        "tamaño_resultados_objetivo": 1.0
     }
 
     # Crear sliders para frecuencia y latencia
@@ -286,6 +292,7 @@ def main():
                         estado["tamaño_boton_objetivo"] = 0.9  # Animación de compresión
                         if not simulacion:
                             ## Reestablecer valres de simulaciones anteriores
+                            estado["mostrar_stats"] = False
                             bits["enviando"] = False
                             bit_reloj["enviando"] = False
                             ciclos_actuales = 0
@@ -309,16 +316,18 @@ def main():
                             estado["simulacion"] = False
                             # Calcular estadísticas
                             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
-                            eficiencia, tiempo_ocio = sim.obtener_estadisticas(tiempo_actual_seg)
-                            txt_estadisticas = assets["fuente_aviso"].render(
-                                f"Eficiencia: {eficiencia:.00f}%, Ocio: {tiempo_ocio:.00f} s",
-                                True, COLOR_TEXTO
-                            )
+                            eficiencia_final, tiempo_ocio_final = sim.obtener_estadisticas(tiempo_actual_seg)
+                            estado["mostrar_stats"] = True
+
+                    # Botón Mostrar más resultados (Solo animación por ahora)
+                    if estado.get("mostrar_stats") and estado["boton_resultados_rect"].collidepoint(mouse_pos):
+                        estado["tamaño_resultados_objetivo"] = 0.9
 
             # Restaurar tamaño de botones cuando se suelta el mouse
             if evento.type == pygame.MOUSEBUTTONUP:
                 estado["tamaño_boton_objetivo"] = 1.0
                 estado["tamaño_parar_objetivo"] = 1.0
+                estado["tamaño_resultados_objetivo"] = 1.0
 
         # B. LÓGICA / ACTUALIZACIÓN
 
@@ -328,6 +337,9 @@ def main():
 
         diferencia_parar = estado["tamaño_parar_objetivo"] - estado["tamaño_parar_actual"]
         estado["tamaño_parar_actual"] += diferencia_parar * 0.50
+
+        diferencia_res = estado["tamaño_resultados_objetivo"] - estado["tamaño_resultados_actual"]
+        estado["tamaño_resultados_actual"] += diferencia_res * 0.50
 
         # Actualizar posición visual del PC (interpolación suave)
         # Si hay simulación, el objetivo es el PC real, si no, vuelve a 1
@@ -378,11 +390,8 @@ def main():
             simulacion = sim.simulando
             estado["simulacion"] = simulacion
             if simulacion == False:
-                eficiencia, tiempo_ocio = sim.obtener_estadisticas(tiempo_actual_seg)
-                txt_estadisticas = assets["fuente_aviso"].render(
-                    f"Eficiencia: {eficiencia:.00f}%, Ocio: {tiempo_ocio:.00f} s",
-                    True, COLOR_TEXTO
-                )
+                eficiencia_final, tiempo_ocio_final = sim.obtener_estadisticas(tiempo_actual_seg)
+                estado["mostrar_stats"] = True
 
         # Lógica de la Intro
         if estado["intro_activa"]:
@@ -439,12 +448,10 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales)
+        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales, eficiencia=eficiencia_final, tiempo_ocio=tiempo_ocio_final)
         ## Info simulacion solo para pruebas
         if txt_out != None:
             pantalla.blit(txt_out, (890, 470))
-        if txt_estadisticas != None:
-            pantalla.blit(txt_estadisticas, (890, 540))
         pygame.display.flip()
         clock.tick(60)
 
