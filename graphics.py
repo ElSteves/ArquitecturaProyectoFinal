@@ -4,8 +4,8 @@ import random
 from config import *
 
 
-def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simulacion_activa=False):
-    """Dibuja la tabla del program counter y resalta el paso actual en verde solo si la simulación está activa."""
+def _dibujar_tabla_program_counter(superficie, recursos, program_counter, highlight_scale=0.0):
+    """Dibuja la tabla del program counter y resalta el paso actual con animación de escala."""
     # Posición inicial de la tabla
     tabla_x = 48
     tabla_y = 210
@@ -19,8 +19,8 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simula
     # Dibujar imagen de la tabla redimensionada
     superficie.blit(tabla_redimensionada, (tabla_x, tabla_y))
     
-    # Resaltar el paso actual en verde SOLO si la simulación está activa
-    if simulacion_activa and 1 <= program_counter <= 7:
+    # Resaltar el paso actual si la escala es visible (> 0.01)
+    if highlight_scale > 0.01 and 1 <= program_counter <= 7:
         # Parámetros del resalte (ajustados para la tabla redimensionada)
         resalte_x = tabla_x + 8            # Posición X relativa al inicio de la tabla
         resalte_ancho = 262                 # Ancho del rectángulo de resalte
@@ -31,17 +31,26 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simula
         # Calcular Y según el paso actual
         resalte_y = resalte_y_inicio + (program_counter - 1) * espaciado_entre_pasos
         
-        # Crear rectángulo de resalte
-        rect_resalte = pygame.Rect(resalte_x, int(resalte_y), resalte_ancho, resalte_alto)
+        # Calcular dimensiones animadas (Pop Up / Pop Out)
+        ancho_actual = int(resalte_ancho * highlight_scale)
+        alto_actual = int(resalte_alto * highlight_scale)
+
+        # Calcular centro para que crezca desde el medio
+        centro_x = resalte_x + resalte_ancho // 2
+        centro_y = resalte_y + resalte_alto // 2
         
-        # Dibujar rectángulo verde semitransparente
-        superficie_resalte = pygame.Surface((resalte_ancho, resalte_alto))
+        # Crear rectángulo centrado con el tamaño animado
+        rect_resalte = pygame.Rect(0, 0, ancho_actual, alto_actual)
+        rect_resalte.center = (centro_x, int(centro_y))
+        
+        # Dibujar rectángulo amarillo semitransparente
+        superficie_resalte = pygame.Surface((ancho_actual, alto_actual))
         superficie_resalte.set_alpha(120)  # Transparencia: 0-255 (120 = semi-transparente)
-        superficie_resalte.fill((0, 255, 0))  # Verde
+        superficie_resalte.fill((255, 255, 0))  # Amarillo brillante
         superficie.blit(superficie_resalte, rect_resalte)
 
 
-def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1):
+def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia=None, slider_latencia=None, program_counter=1, tiempo=0, ciclos=0, eficiencia=0, tiempo_ocio=0):
     """Función maestra de dibujado."""
     pantalla.fill(COLOR_FONDO)
 
@@ -59,15 +68,23 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
     # --- CASO 3: SIMULACIÓN NORMAL ---
     else:
+        frec_actual = slider_frecuencia.obtener_valor() if slider_frecuencia else 0
         # Dibujar base
-        _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj)
+        _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj, frecuencia=frec_actual)
         # Título fijo
         pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2),
                                                                         int(recursos["titulo"].get_height() * 0.2))),
                       (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
 
         # Dibujar tabla del Program Counter
-        _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("simulacion", False))
+        _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("pc_highlight_scale", 0.0))
+
+        # Dibujar HUD de estadísticas (Nuevo UI)
+        _dibujar_estadisticas(pantalla, recursos, tiempo, ciclos)
+
+        # Dibujar Resultados Finales (Estadísticas y Botón)
+        if estado.get("mostrar_stats", False):
+            _dibujar_resultados_finales(pantalla, recursos, estado, eficiencia, tiempo_ocio)
 
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
@@ -78,13 +95,16 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
 
-def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
+def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj, frecuencia=0):
     """Dibuja CPU, Reloj, Botón y Dato (Lo común)."""
     # 1. Placa central
     rect_centro = recursos["centro"].get_rect(center=CENTRO_PANTALLA)
     superficie.blit(recursos["centro"], rect_centro)
 
-    # 2. Texto de pantalla cpu
+    # 2. Efectos CPU (Humo y Calor) - Se dibuja sobre la placa pero bajo los textos/cables
+    _dibujar_efectos_cpu(superficie, estado, frecuencia)
+
+    # 3. Texto de pantalla cpu
     # if bits["enviando"] :
     #     pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
     if estado["waiting"]:
@@ -170,6 +190,32 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
         txt_parar_rect = txt_parar.get_rect(center=rect_parar_animado.center)
         superficie.blit(txt_parar, txt_parar_rect)
 
+    # 7. Botón Fast Forward (FF)
+    boton_ff_rect = estado.get("boton_ff_rect")
+    if boton_ff_rect:
+        activo = estado.get("ff_activo", False)
+        
+        # Color: Naranja brillante si está activo, naranja oscuro si no
+        color_ff = (255, 200, 50) if activo else (200, 140, 20)
+        if boton_ff_rect.collidepoint(mouse_pos):
+            color_ff = (255, 220, 80) if activo else (220, 160, 40)
+            
+        # Animación de escala
+        tamaño_ff = estado.get("tamaño_ff_actual", 1.0)
+        ancho_ff = int(boton_ff_rect.width * tamaño_ff)
+        alto_ff = int(boton_ff_rect.height * tamaño_ff)
+        
+        rect_ff_anim = pygame.Rect(0, 0, ancho_ff, alto_ff)
+        rect_ff_anim.center = boton_ff_rect.center
+        
+        # Dibujar botón
+        pygame.draw.rect(superficie, color_ff, rect_ff_anim, border_radius=10)
+        
+        # Símbolo ">>"
+        fuente_ff = recursos["fuente_boton"]
+        txt_ff = fuente_ff.render(">>", True, (255, 255, 255))
+        superficie.blit(txt_ff, txt_ff.get_rect(center=rect_ff_anim.center))
+
 
 def _dibujar_inicio(pantalla, recursos):
     """Dibuja el título gigante y el texto parpadeante."""
@@ -197,8 +243,10 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuenci
 
     # A. Elementos base apareciendo (Fade In)
     capa = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
-    _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj)
+    frec_intro = slider_frecuencia.obtener_valor() if slider_frecuencia else 0
+    _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj, frecuencia=frec_intro)
     _dibujar_tabla_program_counter(capa, recursos, 1, False)
+    _dibujar_estadisticas(capa, recursos, 0, 0)
     capa.set_alpha(int(255 * suavizado))
     pantalla.blit(capa, (0, 0))
 
@@ -228,3 +276,222 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuenci
     cur_y = yi + (yf - yi) * suavizado
 
     pantalla.blit(img_anim, img_anim.get_rect(center=(int(cur_x), int(cur_y))))
+
+
+def _dibujar_estadisticas(superficie, recursos, tiempo, ciclos):
+    """Dibuja el HUD de estadísticas con estilo de tarjetas en la esquina superior derecha."""
+    # Configuración de estilo
+    ancho_tarjeta = 130
+    alto_tarjeta = 60  # Aumentado para fuente más grande
+    margen_derecho = 30
+    margen_superior = 30
+    espacio_entre = 15
+    offset_etiqueta = 25  # Espacio vertical para el texto arriba
+    color_fondo = (60, 80, 100)  # Gris azulado
+    color_borde = (80, 100, 120) # Borde acorde al fondo
+
+    # Fuentes locales para el HUD
+    fuente_titulo = pygame.font.SysFont("Montserrat", 20, bold=False)
+    fuente_valor = pygame.font.SysFont("Montserrat", 42, bold=True)
+
+    # --- Tarjeta 1: Ciclos (Izquierda) ---
+    x_ciclos = ANCHO_VENTANA - margen_derecho - 2 * ancho_tarjeta - espacio_entre
+    y_burbuja = margen_superior + offset_etiqueta
+    rect_ciclos = pygame.Rect(x_ciclos, y_burbuja, ancho_tarjeta, alto_tarjeta)
+
+    # Etiqueta fuera (arriba)
+    lbl_ciclos = fuente_titulo.render("Ciclos de reloj", True, (180, 180, 190))
+    superficie.blit(lbl_ciclos, lbl_ciclos.get_rect(centerx=rect_ciclos.centerx, bottom=rect_ciclos.top - 5))
+
+    # Burbuja (solo valor)
+    pygame.draw.rect(superficie, color_fondo, rect_ciclos)
+    pygame.draw.rect(superficie, color_borde, rect_ciclos, 2)
+
+    val_ciclos = fuente_valor.render(f"{int(ciclos)}", True, (255, 255, 255))
+    superficie.blit(val_ciclos, val_ciclos.get_rect(center=rect_ciclos.center))
+
+    # --- Tarjeta 2: Tiempo (Derecha) ---
+    x_tiempo = ANCHO_VENTANA - margen_derecho - ancho_tarjeta
+    rect_tiempo = pygame.Rect(x_tiempo, y_burbuja, ancho_tarjeta, alto_tarjeta)
+
+    # Etiqueta fuera (arriba)
+    lbl_tiempo = fuente_titulo.render("Tiempo trans.", True, (180, 180, 190))
+    superficie.blit(lbl_tiempo, lbl_tiempo.get_rect(centerx=rect_tiempo.centerx, bottom=rect_tiempo.top - 5))
+
+    # Burbuja (solo valor)
+    pygame.draw.rect(superficie, color_fondo, rect_tiempo)
+    pygame.draw.rect(superficie, color_borde, rect_tiempo, 2)
+
+    val_tiempo = fuente_valor.render(f"{tiempo:.1f}s", True, (255, 255, 255))
+    superficie.blit(val_tiempo, val_tiempo.get_rect(center=rect_tiempo.center))
+
+
+def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo_ocio):
+    """Dibuja las estadísticas finales y el botón de más resultados."""
+    # Configuración de posición (alineado a la derecha, bajo sliders)
+    # Sliders están en x=950 con ancho 200 -> borde derecho = 1150
+    x_derecha = 1150
+    y_inicio = 420    # Debajo del segundo slider
+
+    # Fuentes
+    fuente_titulo = pygame.font.SysFont("Montserrat", 20, bold=True)
+    fuente_etiqueta = pygame.font.SysFont("Montserrat", 18, bold=False)
+    fuente_valor = pygame.font.SysFont("Montserrat", 22, bold=True)
+
+    # 1. Título
+    txt_titulo = fuente_titulo.render("Estadísticas Simulación", True, (255, 255, 255))
+    rect_titulo = txt_titulo.get_rect(topright=(x_derecha, y_inicio))
+    superficie.blit(txt_titulo, rect_titulo)
+
+    y_actual = rect_titulo.bottom + 20
+
+    # 2. Eficiencia (Cian)
+    txt_ef_val = fuente_valor.render(f"{eficiencia:.0f}%", True, (0, 255, 255))
+    rect_ef_val = txt_ef_val.get_rect(topright=(x_derecha, y_actual))
+    
+    txt_ef_lbl = fuente_etiqueta.render("Eficiencia:", True, (255, 255, 255))
+    rect_ef_lbl = txt_ef_lbl.get_rect(topright=(rect_ef_val.left - 10, y_actual + 2))
+
+    superficie.blit(txt_ef_val, rect_ef_val)
+    superficie.blit(txt_ef_lbl, rect_ef_lbl)
+
+    y_actual += 30
+
+    # 3. Tiempo de Ocio (Rosa Neón)
+    txt_ocio_val = fuente_valor.render(f"{tiempo_ocio:.0f}s", True, (255, 20, 147))
+    rect_ocio_val = txt_ocio_val.get_rect(topright=(x_derecha, y_actual))
+
+    txt_ocio_lbl = fuente_etiqueta.render("Tiempo de Ocio:", True, (255, 255, 255))
+    rect_ocio_lbl = txt_ocio_lbl.get_rect(topright=(rect_ocio_val.left - 10, y_actual + 2))
+
+    superficie.blit(txt_ocio_val, rect_ocio_val)
+    superficie.blit(txt_ocio_lbl, rect_ocio_lbl)
+
+    y_actual += 50
+
+    # 4. Botón 'Mostrar más resultados'
+    boton_rect = estado["boton_resultados_rect"]
+    # Actualizamos la posición del rect en el estado para que coincida con el dibujo
+    boton_rect.topright = (x_derecha, y_actual)
+    
+    # Animación de escala
+    tamaño = estado.get("tamaño_resultados_actual", 1.0)
+    ancho_anim = int(boton_rect.width * tamaño)
+    alto_anim = int(boton_rect.height * tamaño)
+    
+    rect_anim = pygame.Rect(0, 0, ancho_anim, alto_anim)
+    rect_anim.center = boton_rect.center
+
+    # Color e interacción visual
+    mouse_pos = pygame.mouse.get_pos()
+    color_base = (139, 0, 139) # Magenta oscuro
+    color_hover = (180, 50, 180)
+    color = color_hover if boton_rect.collidepoint(mouse_pos) else color_base
+
+    pygame.draw.rect(superficie, color, rect_anim, border_radius=10)
+    
+    # Texto del botón
+    fuente_btn = pygame.font.SysFont("Montserrat", 16, bold=True)
+    txt_btn = fuente_btn.render("Mostrar más resultados", True, (255, 255, 255))
+    superficie.blit(txt_btn, txt_btn.get_rect(center=rect_anim.center))
+
+
+def dibujar_ventana_resultados(pantalla, recursos, estado, historial):
+    """Dibuja el overlay con la gráfica de rendimiento."""
+    # 1. Fondo semitransparente
+    overlay = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA))
+    overlay.set_alpha(220)
+    overlay.fill((20, 20, 30))
+    pantalla.blit(overlay, (0, 0))
+
+    # 2. Contenedor de la gráfica
+    margen_x = 100
+    margen_y = 100
+    ancho_graph = ANCHO_VENTANA - 2 * margen_x
+    alto_graph = ALTO_VENTANA - 2 * margen_y
+    
+    rect_graph = pygame.Rect(margen_x, margen_y, ancho_graph, alto_graph)
+    pygame.draw.rect(pantalla, (40, 40, 50), rect_graph, border_radius=15)
+    pygame.draw.rect(pantalla, (100, 100, 120), rect_graph, 2, border_radius=15)
+
+    # Título de la gráfica
+    fuente_titulo = pygame.font.SysFont("Montserrat", 28, bold=True)
+    txt_titulo = fuente_titulo.render("Monitor de Actividad CPU (Tiempo Real)", True, (255, 255, 255))
+    pantalla.blit(txt_titulo, txt_titulo.get_rect(center=(ANCHO_VENTANA // 2, margen_y + 40)))
+
+    # --- Leyenda ---
+    fuente_leyenda = pygame.font.SysFont("Montserrat", 14, bold=True)
+    
+    # Verde: Procesando
+    pygame.draw.rect(pantalla, (0, 255, 100), (margen_x + 50, margen_y + 70, 12, 12))
+    pantalla.blit(fuente_leyenda.render("Procesando (CPU Activa)", True, (200, 200, 200)), (margen_x + 70, margen_y + 68))
+
+    # Rojo: Esperando
+    pygame.draw.rect(pantalla, (255, 50, 50), (margen_x + 260, margen_y + 70, 12, 12))
+    pantalla.blit(fuente_leyenda.render("Esperando (Latencia RAM)", True, (200, 200, 200)), (margen_x + 280, margen_y + 68))
+
+    # 3. Dibujar Gráfica (Barras)
+    if len(historial) > 0:
+        # Área útil para las barras (ajustada para dar espacio a la leyenda)
+        area_barras = pygame.Rect(margen_x + 30, margen_y + 100, ancho_graph - 60, alto_graph - 180)
+        # pygame.draw.rect(pantalla, (0, 0, 0), area_barras) # Debug fondo barras
+
+        ancho_barra = area_barras.width / 200  # 200 es el maxlen del deque
+        
+        for i, valor in enumerate(historial):
+            # 1 = Activo (Verde, Alto), 0 = Espera (Rojo, Bajo)
+            es_activo = (valor == 1)
+            
+            color = (0, 255, 100) if es_activo else (255, 50, 50)
+            altura = area_barras.height * 0.8 if es_activo else area_barras.height * 0.15
+            
+            x = area_barras.x + i * ancho_barra
+            y = area_barras.bottom - altura
+            
+            # Dibujar barra (con un pequeño espacio entre ellas si el ancho lo permite)
+            ancho_dibujo = max(1, ancho_barra - 1)
+            pygame.draw.rect(pantalla, color, (x, y, ancho_dibujo, altura))
+
+    # 4. Botón Cerrar
+    rect_cerrar = estado["boton_cerrar_resultados_rect"]
+    # Aseguramos que esté posicionado visualmente donde queremos (abajo centro del modal)
+    rect_cerrar.center = (ANCHO_VENTANA // 2, margen_y + alto_graph - 50)
+    
+    mouse_pos = pygame.mouse.get_pos()
+    color_cerrar = (200, 50, 50) if rect_cerrar.collidepoint(mouse_pos) else (150, 30, 30)
+    
+    pygame.draw.rect(pantalla, color_cerrar, rect_cerrar, border_radius=10)
+    pygame.draw.rect(pantalla, (255, 255, 255), rect_cerrar, 2, border_radius=10)
+    
+    txt_cerrar = recursos["fuente_boton"].render("CERRAR", True, (255, 255, 255))
+    pantalla.blit(txt_cerrar, txt_cerrar.get_rect(center=rect_cerrar.center))
+
+
+def _dibujar_efectos_cpu(superficie, estado, frecuencia):
+    """Dibuja humo y efectos de calor sobre la CPU."""
+    # 1. Humo
+    for p in estado.get("particulas_humo", []):
+        x, y, vy, r, a = p
+        if a > 0:
+            # Crear superficie temporal para transparencia
+            diametro = int(r * 2)
+            surf_humo = pygame.Surface((diametro, diametro), pygame.SRCALPHA)
+            color = (100, 100, 100, int(a))
+            pygame.draw.circle(surf_humo, color, (int(r), int(r)), int(r))
+            superficie.blit(surf_humo, (x - r, y - r))
+
+    # 2. Calor Extremo (Glow Rojo)
+    if frecuencia >= 9.8:
+        # AJUSTES DE POSICIÓN DEL CALOR (Deben coincidir con el humo)
+        ajuste_x = -145
+        ajuste_y = 30
+
+        # Círculo rojo brillante con mezcla aditiva
+        radio_calor = 70
+        surf_calor = pygame.Surface((radio_calor * 2, radio_calor * 2), pygame.SRCALPHA)
+        # Rojo con transparencia
+        pygame.draw.circle(surf_calor, (255, 50, 0, 100), (radio_calor, radio_calor), radio_calor)
+        
+        rect_calor = surf_calor.get_rect(center=(CENTRO_PANTALLA[0] + ajuste_x, CENTRO_PANTALLA[1] + ajuste_y))
+        # Usar BLEND_ADD para efecto de luz/brillo
+        superficie.blit(surf_calor, rect_calor, special_flags=pygame.BLEND_ADD)
