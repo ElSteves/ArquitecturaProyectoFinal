@@ -68,8 +68,9 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
     # --- CASO 3: SIMULACIÓN NORMAL ---
     else:
+        frec_actual = slider_frecuencia.obtener_valor() if slider_frecuencia else 0
         # Dibujar base
-        _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj)
+        _dibujar_elementos_base(pantalla, recursos, estado, bits, bit_reloj, frecuencia=frec_actual)
         # Título fijo
         pantalla.blit(pygame.transform.smoothscale(recursos["titulo"], (int(recursos["titulo"].get_width() * 0.2),
                                                                         int(recursos["titulo"].get_height() * 0.2))),
@@ -94,13 +95,16 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
 
-def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
+def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj, frecuencia=0):
     """Dibuja CPU, Reloj, Botón y Dato (Lo común)."""
     # 1. Placa central
     rect_centro = recursos["centro"].get_rect(center=CENTRO_PANTALLA)
     superficie.blit(recursos["centro"], rect_centro)
 
-    # 2. Texto de pantalla cpu
+    # 2. Efectos CPU (Humo y Calor) - Se dibuja sobre la placa pero bajo los textos/cables
+    _dibujar_efectos_cpu(superficie, estado, frecuencia)
+
+    # 3. Texto de pantalla cpu
     # if bits["enviando"] :
     #     pos_w = (rect_centro.x + AJUSTE_WAITING_X, rect_centro.y + AJUSTE_WAITING_Y)
     if estado["waiting"]:
@@ -239,8 +243,10 @@ def _dibujar_intro(pantalla, recursos, estado, bits, bit_reloj, slider_frecuenci
 
     # A. Elementos base apareciendo (Fade In)
     capa = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
-    _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj)
+    frec_intro = slider_frecuencia.obtener_valor() if slider_frecuencia else 0
+    _dibujar_elementos_base(capa, recursos, estado, bits, bit_reloj, frecuencia=frec_intro)
     _dibujar_tabla_program_counter(capa, recursos, 1, False)
+    _dibujar_estadisticas(capa, recursos, 0, 0)
     capa.set_alpha(int(255 * suavizado))
     pantalla.blit(capa, (0, 0))
 
@@ -413,10 +419,21 @@ def dibujar_ventana_resultados(pantalla, recursos, estado, historial):
     txt_titulo = fuente_titulo.render("Monitor de Actividad CPU (Tiempo Real)", True, (255, 255, 255))
     pantalla.blit(txt_titulo, txt_titulo.get_rect(center=(ANCHO_VENTANA // 2, margen_y + 40)))
 
+    # --- Leyenda ---
+    fuente_leyenda = pygame.font.SysFont("Montserrat", 14, bold=True)
+    
+    # Verde: Procesando
+    pygame.draw.rect(pantalla, (0, 255, 100), (margen_x + 50, margen_y + 70, 12, 12))
+    pantalla.blit(fuente_leyenda.render("Procesando (CPU Activa)", True, (200, 200, 200)), (margen_x + 70, margen_y + 68))
+
+    # Rojo: Esperando
+    pygame.draw.rect(pantalla, (255, 50, 50), (margen_x + 260, margen_y + 70, 12, 12))
+    pantalla.blit(fuente_leyenda.render("Esperando (Latencia RAM)", True, (200, 200, 200)), (margen_x + 280, margen_y + 68))
+
     # 3. Dibujar Gráfica (Barras)
     if len(historial) > 0:
-        # Área útil para las barras
-        area_barras = pygame.Rect(margen_x + 30, margen_y + 80, ancho_graph - 60, alto_graph - 160)
+        # Área útil para las barras (ajustada para dar espacio a la leyenda)
+        area_barras = pygame.Rect(margen_x + 30, margen_y + 100, ancho_graph - 60, alto_graph - 180)
         # pygame.draw.rect(pantalla, (0, 0, 0), area_barras) # Debug fondo barras
 
         ancho_barra = area_barras.width / 200  # 200 es el maxlen del deque
@@ -448,3 +465,33 @@ def dibujar_ventana_resultados(pantalla, recursos, estado, historial):
     
     txt_cerrar = recursos["fuente_boton"].render("CERRAR", True, (255, 255, 255))
     pantalla.blit(txt_cerrar, txt_cerrar.get_rect(center=rect_cerrar.center))
+
+
+def _dibujar_efectos_cpu(superficie, estado, frecuencia):
+    """Dibuja humo y efectos de calor sobre la CPU."""
+    # 1. Humo
+    for p in estado.get("particulas_humo", []):
+        x, y, vy, r, a = p
+        if a > 0:
+            # Crear superficie temporal para transparencia
+            diametro = int(r * 2)
+            surf_humo = pygame.Surface((diametro, diametro), pygame.SRCALPHA)
+            color = (100, 100, 100, int(a))
+            pygame.draw.circle(surf_humo, color, (int(r), int(r)), int(r))
+            superficie.blit(surf_humo, (x - r, y - r))
+
+    # 2. Calor Extremo (Glow Rojo)
+    if frecuencia >= 9.8:
+        # AJUSTES DE POSICIÓN DEL CALOR (Deben coincidir con el humo)
+        ajuste_x = -145
+        ajuste_y = 30
+
+        # Círculo rojo brillante con mezcla aditiva
+        radio_calor = 70
+        surf_calor = pygame.Surface((radio_calor * 2, radio_calor * 2), pygame.SRCALPHA)
+        # Rojo con transparencia
+        pygame.draw.circle(surf_calor, (255, 50, 0, 100), (radio_calor, radio_calor), radio_calor)
+        
+        rect_calor = surf_calor.get_rect(center=(CENTRO_PANTALLA[0] + ajuste_x, CENTRO_PANTALLA[1] + ajuste_y))
+        # Usar BLEND_ADD para efecto de luz/brillo
+        superficie.blit(surf_calor, rect_calor, special_flags=pygame.BLEND_ADD)

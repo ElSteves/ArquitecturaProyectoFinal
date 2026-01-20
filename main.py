@@ -30,9 +30,9 @@ class Simulacion:
         self.distancia_CPU = 261
         self.inx = inx
         self.finx = finx
-        self.pixelsPorSeg = (60 * self.periodo_CPU / self.frecuenciaCPU)
-        self.velBitRelojRAM = int(self.distancia_RAM / self.pixelsPorSeg)
-        self.velBitRelojCPU = int(self.distancia_CPU / self.pixelsPorSeg)
+        frames_por_ciclo = 60 / self.frecuenciaCPU
+        self.velBitRelojRAM = self.distancia_RAM / frames_por_ciclo
+        self.velBitRelojCPU = self.distancia_CPU / frames_por_ciclo
 
     # Obtener stats
     def obtener_estadisticas(self, tiempo_total_sim):
@@ -42,7 +42,15 @@ class Simulacion:
 
     def _esperar(self, segundos):
         """Espera una cantidad de tiempo ajustada por la escala de tiempo actual."""
-        time.sleep(segundos / self.time_scale)
+        tiempo_objetivo = segundos
+        tiempo_acumulado_sim = 0.0
+        
+        while tiempo_acumulado_sim < tiempo_objetivo and self.simulando:
+            t_inicio = time.perf_counter()
+            time.sleep(0.01)  # Pausa pequeña (10ms) para permitir cambios de escala
+            t_fin = time.perf_counter()
+            dt_real = t_fin - t_inicio
+            tiempo_acumulado_sim += dt_real * self.time_scale
 
     ## Se debe llamar con un hilo, demora la ejecucion de la simulación el tiempo de latencia
     def proceso_RAM(self, bits, estado):
@@ -173,6 +181,45 @@ class relojInterno:
         return self.tiempo_acumulado
 
 
+def _actualizar_humo(estado, frecuencia):
+    """Actualiza la lógica de partículas de humo basado en la frecuencia."""
+    # Generar nuevas partículas si la frecuencia es alta
+    if frecuencia >= 7:
+        cantidad = 0
+        probabilidad = 0.3
+        
+        if frecuencia >= 9.8: # Máximo calor
+            cantidad = 2
+            probabilidad = 0.8
+        elif frecuencia >= 7:
+            cantidad = 1
+            probabilidad = 0.4
+            
+        # AJUSTES DE POSICIÓN DEL HUMO (Cambia estos valores)
+        ajuste_x = -145  # Positivo = Derecha, Negativo = Izquierda
+        ajuste_y = 30  # Positivo = Abajo, Negativo = Arriba
+
+        if random.random() < probabilidad:
+            for _ in range(cantidad):
+                # Posición aleatoria cerca del centro (CPU)
+                x = CENTRO_PANTALLA[0] + ajuste_x + random.randint(-30, 30)
+                y = CENTRO_PANTALLA[1] + ajuste_y + random.randint(-20, 20)
+                vy = random.uniform(1.0, 3.0)  # Velocidad vertical (sube)
+                radio = random.uniform(5.0, 12.0)
+                transparencia = 180
+                # [x, y, vy, radio, transparencia]
+                estado["particulas_humo"].append([x, y, vy, radio, transparencia])
+
+    # Actualizar partículas existentes
+    for p in estado["particulas_humo"][:]:
+        p[1] -= p[2]       # Mover arriba (y disminuye)
+        p[3] += 0.15       # Crecer (radio aumenta)
+        p[4] -= 3          # Desvanecer (alpha disminuye)
+        
+        if p[4] <= 0:
+            estado["particulas_humo"].remove(p)
+
+
 # wasa
 def main():
     pygame.init()
@@ -229,7 +276,9 @@ def main():
         # Monitor de Recursos (Overlay)
         "mostrando_resultados": False,
         "historial_actividad": deque(maxlen=200),
-        "boton_cerrar_resultados_rect": pygame.Rect(0, 0, 150, 50)
+        "boton_cerrar_resultados_rect": pygame.Rect(0, 0, 150, 50),
+        # Efectos Visuales
+        "particulas_humo": []
     }
 
     # Crear sliders para frecuencia y latencia
@@ -387,6 +436,10 @@ def main():
         diferencia_ff = estado["tamaño_ff_objetivo"] - estado["tamaño_ff_actual"]
         estado["tamaño_ff_actual"] += diferencia_ff * 0.50
 
+        # Actualizar humo basado en frecuencia actual
+        frec_actual = slider_frecuencia.obtener_valor()
+        _actualizar_humo(estado, frec_actual)
+
         # Actualizar posición visual del PC (interpolación suave)
         # Si hay simulación, el objetivo es el PC real, si no, vuelve a 1
         target_pc = sim.program_counter if simulacion else 1
@@ -411,7 +464,10 @@ def main():
             # Si waiting es True, es 0 (Rojo). Si no, asumimos procesando (Verde).
             es_espera = estado.get("waiting", False)
             valor_actividad = 0 if es_espera else 1
-            estado["historial_actividad"].append(valor_actividad)
+            
+            # Agregar muestras proporcionales a la escala para mantener la consistencia visual
+            for _ in range(int(scale)):
+                estado["historial_actividad"].append(valor_actividad)
 
             ### Tiempo de simulación
             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
