@@ -4,8 +4,8 @@ import random
 from config import *
 
 
-def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simulacion_activa=False):
-    """Dibuja la tabla del program counter y resalta el paso actual en verde solo si la simulación está activa."""
+def _dibujar_tabla_program_counter(superficie, recursos, program_counter, highlight_scale=0.0):
+    """Dibuja la tabla del program counter y resalta el paso actual con animación de escala."""
     # Posición inicial de la tabla
     tabla_x = 48
     tabla_y = 210
@@ -19,8 +19,8 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simula
     # Dibujar imagen de la tabla redimensionada
     superficie.blit(tabla_redimensionada, (tabla_x, tabla_y))
     
-    # Resaltar el paso actual en verde SOLO si la simulación está activa
-    if simulacion_activa and 1 <= program_counter <= 7:
+    # Resaltar el paso actual si la escala es visible (> 0.01)
+    if highlight_scale > 0.01 and 1 <= program_counter <= 7:
         # Parámetros del resalte (ajustados para la tabla redimensionada)
         resalte_x = tabla_x + 8            # Posición X relativa al inicio de la tabla
         resalte_ancho = 262                 # Ancho del rectángulo de resalte
@@ -31,13 +31,22 @@ def _dibujar_tabla_program_counter(superficie, recursos, program_counter, simula
         # Calcular Y según el paso actual
         resalte_y = resalte_y_inicio + (program_counter - 1) * espaciado_entre_pasos
         
-        # Crear rectángulo de resalte
-        rect_resalte = pygame.Rect(resalte_x, int(resalte_y), resalte_ancho, resalte_alto)
+        # Calcular dimensiones animadas (Pop Up / Pop Out)
+        ancho_actual = int(resalte_ancho * highlight_scale)
+        alto_actual = int(resalte_alto * highlight_scale)
+
+        # Calcular centro para que crezca desde el medio
+        centro_x = resalte_x + resalte_ancho // 2
+        centro_y = resalte_y + resalte_alto // 2
         
-        # Dibujar rectángulo verde semitransparente
-        superficie_resalte = pygame.Surface((resalte_ancho, resalte_alto))
+        # Crear rectángulo centrado con el tamaño animado
+        rect_resalte = pygame.Rect(0, 0, ancho_actual, alto_actual)
+        rect_resalte.center = (centro_x, int(centro_y))
+        
+        # Dibujar rectángulo amarillo semitransparente
+        superficie_resalte = pygame.Surface((ancho_actual, alto_actual))
         superficie_resalte.set_alpha(120)  # Transparencia: 0-255 (120 = semi-transparente)
-        superficie_resalte.fill((0, 255, 0))  # Verde
+        superficie_resalte.fill((255, 255, 0))  # Amarillo brillante
         superficie.blit(superficie_resalte, rect_resalte)
 
 
@@ -67,7 +76,7 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
                       (POS_TITULO_FINAL_X, POS_TITULO_FINAL_Y))
 
         # Dibujar tabla del Program Counter
-        _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("simulacion", False))
+        _dibujar_tabla_program_counter(pantalla, recursos, program_counter, estado.get("pc_highlight_scale", 0.0))
 
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:

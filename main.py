@@ -201,6 +201,7 @@ def main():
         "ejecutando...": False,
         "simulacion": False,
         "pc_visual": 1.0,  # Posición visual suavizada del Program Counter
+        "pc_highlight_scale": 0.0,  # Escala del resaltado (0.0 a 1.0) para animación Pop Up
         # Animación de botones
         "tamaño_boton_actual": 1.0,
         "tamaño_boton_objetivo": 1.0,
@@ -243,11 +244,11 @@ def main():
     }
 
     # Ubicar botón
-    estado["boton_rect"].center = (ANCHO_VENTANA // 2 - 100, ALTO_VENTANA - 100)
+    estado["boton_rect"].center = (ANCHO_VENTANA // 2 - 90, ALTO_VENTANA - 100)
 
     # Crear botón para parar
     boton_parar_rect = pygame.Rect(0, 0, 150, 50)
-    boton_parar_rect.center = (ANCHO_VENTANA // 2 + 100, ALTO_VENTANA - 100)
+    boton_parar_rect.center = (ANCHO_VENTANA // 2 + 90, ALTO_VENTANA - 100)
     estado["boton_parar_rect"] = boton_parar_rect
 
     # --- BUCLE PRINCIPAL ---
@@ -332,6 +333,11 @@ def main():
         # Si hay simulación, el objetivo es el PC real, si no, vuelve a 1
         target_pc = sim.program_counter if simulacion else 1
         estado["pc_visual"] += (target_pc - estado["pc_visual"]) * 0.2
+
+        # Actualizar escala del resaltado (Animación Pop Up / Pop Out)
+        # Si hay simulación, crece a 1.0, si no, se encoge a 0.0
+        target_scale = 1.0 if simulacion else 0.0
+        estado["pc_highlight_scale"] += (target_scale - estado["pc_highlight_scale"]) * 0.2
 
         ## Simulacion
 
