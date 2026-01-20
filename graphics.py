@@ -186,6 +186,32 @@ def _dibujar_elementos_base(superficie, recursos, estado, bits, bit_reloj):
         txt_parar_rect = txt_parar.get_rect(center=rect_parar_animado.center)
         superficie.blit(txt_parar, txt_parar_rect)
 
+    # 7. Botón Fast Forward (FF)
+    boton_ff_rect = estado.get("boton_ff_rect")
+    if boton_ff_rect:
+        activo = estado.get("ff_activo", False)
+        
+        # Color: Naranja brillante si está activo, naranja oscuro si no
+        color_ff = (255, 200, 50) if activo else (200, 140, 20)
+        if boton_ff_rect.collidepoint(mouse_pos):
+            color_ff = (255, 220, 80) if activo else (220, 160, 40)
+            
+        # Animación de escala
+        tamaño_ff = estado.get("tamaño_ff_actual", 1.0)
+        ancho_ff = int(boton_ff_rect.width * tamaño_ff)
+        alto_ff = int(boton_ff_rect.height * tamaño_ff)
+        
+        rect_ff_anim = pygame.Rect(0, 0, ancho_ff, alto_ff)
+        rect_ff_anim.center = boton_ff_rect.center
+        
+        # Dibujar botón
+        pygame.draw.rect(superficie, color_ff, rect_ff_anim, border_radius=10)
+        
+        # Símbolo ">>"
+        fuente_ff = recursos["fuente_boton"]
+        txt_ff = fuente_ff.render(">>", True, (255, 255, 255))
+        superficie.blit(txt_ff, txt_ff.get_rect(center=rect_ff_anim.center))
+
 
 def _dibujar_inicio(pantalla, recursos):
     """Dibuja el título gigante y el texto parpadeante."""

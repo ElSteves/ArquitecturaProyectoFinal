@@ -21,6 +21,7 @@ class Simulacion:
         self.simulando = True
         self.tiempo_ocio = 0.0
         self.eficiencia = 0.0
+        self.time_scale = 1.0  # Escala de tiempo (1.0 = normal, 5.0 = rápido)
 
         ## Parametros para animaciones
         # Distancias
@@ -38,21 +39,26 @@ class Simulacion:
         self.eficiencia = (aux / tiempo_total_sim) * 100
         return self.eficiencia, self.tiempo_ocio
 
+    def _esperar(self, segundos):
+        """Espera una cantidad de tiempo ajustada por la escala de tiempo actual."""
+        time.sleep(segundos / self.time_scale)
+
     ## Se debe llamar con un hilo, demora la ejecucion de la simulación el tiempo de latencia
     def proceso_RAM(self, bits, estado):
         estado["fetching"], estado["waiting"], estado["exec"] = False, True, False
 
         self.transportar_bit(bits, 0)
-        time.sleep(TIEMPO_DATO)  # segundos
+        self._esperar(TIEMPO_DATO)  # segundos
 
         inicio_espera = time.time()
         # RAM espera en base a su latencia
-        time.sleep(self.latenciaRAM)
-        self.tiempo_ocio += (time.time() - inicio_espera)
+        self._esperar(self.latenciaRAM)
+        # Ajustamos el ocio calculado multiplicando por la escala para obtener el tiempo "simulado"
+        self.tiempo_ocio += (time.time() - inicio_espera) * self.time_scale
 
         self.transportar_bit(bits, 1)
 
-        time.sleep(TIEMPO_DATO)
+        self._esperar(TIEMPO_DATO)
 
         estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
 
@@ -61,9 +67,9 @@ class Simulacion:
         estado["ejecutando..."] = True
         # FETCH: Pedir instruccion
         estado["fetching"], estado["waiting"], estado["exec"] = True, False, False
-        time.sleep(self.periodo_CPU)  # Demora 1 ciclo
+        self._esperar(self.periodo_CPU)  # Demora 1 ciclo
         self.proceso_RAM(bits, estado)  # Pide instruccion
-        time.sleep(TIEMPO_DATO)
+        self._esperar(TIEMPO_DATO)
 
         # EXCEC- PC: Program Counter
         match self.program_counter:
@@ -72,7 +78,7 @@ class Simulacion:
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 10
                 # LLeva el dato al acumulador - 1 ciclo
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU)
+                self._esperar(self.periodo_CPU)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
                 self.program_counter += 1
             # ADD 11
@@ -80,26 +86,26 @@ class Simulacion:
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 11
                 # Lleva el dato al registro y lo suma en la ALU (2 ciclos )
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU * 2)
+                self._esperar(self.periodo_CPU * 2)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
                 self.program_counter += 1
             # STORE 10
             case 3:
                 # Guarda lo que hay en el acumulador en la dir 10
                 self.transportar_bit(bits, 0)
-                time.sleep(TIEMPO_DATO)  # segundos
+                self._esperar(TIEMPO_DATO)  # segundos
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU)
+                self._esperar(self.periodo_CPU)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
-                time.sleep(self.latenciaRAM)
+                self._esperar(self.latenciaRAM)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
                 self.program_counter += 1
             # OUT 10
             case 4:
                 # Envía instrucción a la ram
                 self.transportar_bit(bits, 0)
-                time.sleep(TIEMPO_DATO)  # segundos
-                time.sleep(self.latenciaRAM)
+                self._esperar(TIEMPO_DATO)  # segundos
+                self._esperar(self.latenciaRAM)
                 # RAM responde al dispositivo de salida
                 ### FALTA IMPLEMENTAR
                 self.out += 1
@@ -109,7 +115,7 @@ class Simulacion:
                 self.proceso_RAM(bits, estado)  # pide dato de la direccion 12 (limite del contador )
                 # LLeva el dato al registro y lo resta en la ALU - 2 ciclos
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU * 2)
+                self._esperar(self.periodo_CPU * 2)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
                 self.program_counter += 1
             # JNZ 01
@@ -117,7 +123,7 @@ class Simulacion:
                 ### Demora un ciclo en comprobar si el contador llebo al limite
                 # La actualizacion del contador se lo hace en el bucle principal
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU)
+                self._esperar(self.periodo_CPU)
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, False
 
                 if self.out < LIMIT_COUNTER:
@@ -130,7 +136,7 @@ class Simulacion:
                 ### Demora un ciclo en terminal el programa
                 # La finalizacion del programa se lo hace en el bucle principal
                 estado["fetching"], estado["waiting"], estado["exec"] = False, False, True
-                time.sleep(self.periodo_CPU)
+                self._esperar(self.periodo_CPU)
                 self.simulando = False
 
         estado["ejecutando..."] = False
@@ -154,15 +160,16 @@ class Simulacion:
 # Inicia un cronómetro
 class relojInterno:
     def __init__(self):
-        self.tiempo_inicial = 0.0
-        self.tiempo_actual = 0.0
+        self.tiempo_acumulado = 0.0
 
     def iniciarReloj(self):
-        self.tiempo_inicial = pygame.time.get_ticks()
+        self.tiempo_acumulado = 0.0
+
+    def actualizar(self, dt_segundos, escala):
+        self.tiempo_acumulado += dt_segundos * escala
 
     def obtenerTiempoActual(self):
-        self.tiempo_actual = pygame.time.get_ticks()
-        return (self.tiempo_actual - self.tiempo_inicial) / 1000
+        return self.tiempo_acumulado
 
 
 # wasa
@@ -212,7 +219,12 @@ def main():
         "mostrar_stats": False,
         "boton_resultados_rect": pygame.Rect(0, 0, 200, 40),
         "tamaño_resultados_actual": 1.0,
-        "tamaño_resultados_objetivo": 1.0
+        "tamaño_resultados_objetivo": 1.0,
+        # Fast Forward (Adelantar)
+        "boton_ff_rect": pygame.Rect(0, 0, 50, 50),
+        "ff_activo": False,
+        "tamaño_ff_actual": 1.0,
+        "tamaño_ff_objetivo": 1.0
     }
 
     # Crear sliders para frecuencia y latencia
@@ -250,16 +262,23 @@ def main():
     }
 
     # Ubicar botón
-    estado["boton_rect"].center = (ANCHO_VENTANA // 2 - 90, ALTO_VENTANA - 100)
+    estado["boton_rect"].center = (ANCHO_VENTANA // 2 - 120, ALTO_VENTANA - 100)
 
     # Crear botón para parar
     boton_parar_rect = pygame.Rect(0, 0, 150, 50)
-    boton_parar_rect.center = (ANCHO_VENTANA // 2 + 90, ALTO_VENTANA - 100)
+    boton_parar_rect.center = (ANCHO_VENTANA // 2 + 120, ALTO_VENTANA - 100)
     estado["boton_parar_rect"] = boton_parar_rect
+
+    # Ubicar botón FF (Centro)
+    estado["boton_ff_rect"].center = (ANCHO_VENTANA // 2, ALTO_VENTANA - 100)
 
     # --- BUCLE PRINCIPAL ---
     corriendo = True
     while corriendo:
+        # Calcular delta time al inicio del frame para el reloj virtual
+        dt_ms = clock.tick(60)
+        dt_s = dt_ms / 1000.0
+
         mouse_pos = pygame.mouse.get_pos()
         # print("x:", mouse_pos[0], "y: ", mouse_pos[1])
         # A. EVENTOS
@@ -319,6 +338,11 @@ def main():
                             eficiencia_final, tiempo_ocio_final = sim.obtener_estadisticas(tiempo_actual_seg)
                             estado["mostrar_stats"] = True
 
+                    # Botón Fast Forward
+                    if estado["boton_ff_rect"].collidepoint(mouse_pos):
+                        estado["tamaño_ff_objetivo"] = 0.8
+                        estado["ff_activo"] = True
+
                     # Botón Mostrar más resultados (Solo animación por ahora)
                     if estado.get("mostrar_stats") and estado["boton_resultados_rect"].collidepoint(mouse_pos):
                         estado["tamaño_resultados_objetivo"] = 0.9
@@ -328,6 +352,8 @@ def main():
                 estado["tamaño_boton_objetivo"] = 1.0
                 estado["tamaño_parar_objetivo"] = 1.0
                 estado["tamaño_resultados_objetivo"] = 1.0
+                estado["tamaño_ff_objetivo"] = 1.0
+                estado["ff_activo"] = False
 
         # B. LÓGICA / ACTUALIZACIÓN
 
@@ -341,6 +367,9 @@ def main():
         diferencia_res = estado["tamaño_resultados_objetivo"] - estado["tamaño_resultados_actual"]
         estado["tamaño_resultados_actual"] += diferencia_res * 0.50
 
+        diferencia_ff = estado["tamaño_ff_objetivo"] - estado["tamaño_ff_actual"]
+        estado["tamaño_ff_actual"] += diferencia_ff * 0.50
+
         # Actualizar posición visual del PC (interpolación suave)
         # Si hay simulación, el objetivo es el PC real, si no, vuelve a 1
         target_pc = sim.program_counter if simulacion else 1
@@ -351,9 +380,16 @@ def main():
         target_scale = 1.0 if simulacion else 0.0
         estado["pc_highlight_scale"] += (target_scale - estado["pc_highlight_scale"]) * 0.2
 
+        # Determinar escala de tiempo global
+        scale = 5.0 if estado["ff_activo"] else 1.0
+
         ## Simulacion
 
         if simulacion:
+            # Aplicar escala a la simulación y al reloj
+            sim.time_scale = scale
+            reloj_interno.actualizar(dt_s, scale)
+
             ### Tiempo de simulación
             tiempo_actual_seg = reloj_interno.obtenerTiempoActual()
 
@@ -406,12 +442,12 @@ def main():
         # 1: Hacia la izquierda
         if bits["enviando"]:
             if bits["direccion"] == 1:
-                bits["x"] -= VELOCIDAD_DATO
+                bits["x"] -= VELOCIDAD_DATO * scale
                 if bits["x"] <= inicio_cable_x:
                     bits["x"] = inicio_cable_x
                     bits["enviando"] = False
             elif bits["direccion"] == 0:  # Hacia la derecha
-                bits["x"] += VELOCIDAD_DATO
+                bits["x"] += VELOCIDAD_DATO * scale
                 if bits["x"] >= fin_cable_x:
                     bits["x"] = fin_cable_x
                     bits["enviando"] = False
@@ -421,27 +457,27 @@ def main():
             bit_reloj["estado"] = True
             ##derecha
             if bit_reloj["y_d"] == 230 and bit_reloj["x_d"] < 705:
-                bit_reloj["x_d"] += sim.velBitRelojRAM
+                bit_reloj["x_d"] += sim.velBitRelojRAM * scale
                 if bit_reloj["x_d"] > 705:
                     bit_reloj["x_d"] = 705
 
             if bit_reloj["x_d"] == 705 and bit_reloj["y_d"] < 340:
-                bit_reloj["y_d"] += sim.velBitRelojRAM
+                bit_reloj["y_d"] += sim.velBitRelojRAM * scale
                 if bit_reloj["y_d"] > 340:
                     bit_reloj["y_d"] = 340
 
             if bit_reloj["y_d"] == 340 and bit_reloj["x_d"] < 735:
-                bit_reloj["x_d"] += sim.velBitRelojRAM
+                bit_reloj["x_d"] += sim.velBitRelojRAM * scale
                 if bit_reloj["x_d"] > 735:
                     bit_reloj["x_d"] = 735
 
             ##izquierda
             if (bit_reloj["y_i"] == 230 and bit_reloj["x_i"] > 420):
-                bit_reloj["x_i"] -= sim.velBitRelojCPU
+                bit_reloj["x_i"] -= sim.velBitRelojCPU * scale
                 if bit_reloj["x_i"] < 420:
                     bit_reloj["x_i"] = 420
             if (bit_reloj["x_i"] == 420 and bit_reloj["y_i"] < 316):
-                bit_reloj["y_i"] += sim.velBitRelojCPU
+                bit_reloj["y_i"] += sim.velBitRelojCPU * scale
                 if bit_reloj["y_i"] > 316:
                     bit_reloj["y_i"] = 316
                     bit_reloj["enviando"] = False
@@ -453,7 +489,6 @@ def main():
         if txt_out != None:
             pantalla.blit(txt_out, (890, 470))
         pygame.display.flip()
-        clock.tick(60)
 
     pygame.quit()
     sys.exit()
