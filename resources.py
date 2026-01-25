@@ -2,7 +2,6 @@ import pygame
 import os
 import sys
 from config import *
-#wasa
 
 def cargar_recursos():
     """Carga todas las imágenes y fuentes, retornando un diccionario."""

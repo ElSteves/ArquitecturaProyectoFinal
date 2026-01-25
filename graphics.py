@@ -453,7 +453,7 @@ def dibujar_ventana_tabla(pantalla, recursos, estado, historial_simulaciones):
     columnas = [
         ("Sim", 65),
         ("Latencia (s)", 120),
-        ("Frec. (MHz)", 120),
+        ("Frec. (Hz)", 120),
         ("Tiempo (s)", 120),
         ("Ocio (s)", 110),
         ("Ciclos", 100),
