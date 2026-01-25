@@ -226,7 +226,6 @@ def _actualizar_humo(estado, frecuencia):
             estado["particulas_humo"].remove(p)
 
 
-# wasa
 def main():
     pygame.init()
     pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
@@ -243,6 +242,9 @@ def main():
     ciclos_totales = 0
     ultimo_ciclo_procesado = 0
     txt_out = None
+    
+    # Inicializar sim con valores default (para evitar errores si se intenta acceder antes de crear la simulación)
+    sim = Simulacion(0, 0, 1, 0)
 
     # 1. Cargar Recursos
     assets = resources.cargar_recursos()
@@ -284,6 +286,14 @@ def main():
         "mostrando_resultados": False,
         "historial_actividad": deque(maxlen=200),
         "boton_cerrar_resultados_rect": pygame.Rect(0, 0, 150, 50),
+        # Botón Mostrar Tabla
+        "boton_tabla_rect": pygame.Rect(0, 0, 150, 40),
+        "tamaño_tabla_actual": 1.0,
+        "tamaño_tabla_objetivo": 1.0,
+        "mostrando_tabla": False,
+        "boton_cerrar_tabla_rect": pygame.Rect(0, 0, 150, 50),
+        "historial_simulaciones": [],
+        "simulacion_guardada": False,  # Flag para evitar guardar múltiples veces
         # Efectos Visuales
         "particulas_humo": []
     }
@@ -375,6 +385,13 @@ def main():
                         estado["mostrando_resultados"] = False
                 continue  # Si estamos mostrando resultados, no procesar el resto de eventos del juego
 
+            # Eventos específicos del Overlay de Tabla
+            if estado["mostrando_tabla"]:
+                if evento.type == pygame.MOUSEBUTTONDOWN:
+                    if estado["boton_cerrar_tabla_rect"].collidepoint(mouse_pos):
+                        estado["mostrando_tabla"] = False
+                continue  # Si estamos mostrando tabla, no procesar el resto de eventos del juego
+
             # Manejar eventos de sliders
             if not estado["pantalla_inicio"] and not estado["intro_activa"] and not simulacion:
                 slider_frecuencia.manejar_evento(evento, mouse_pos)
@@ -387,6 +404,7 @@ def main():
                         if not simulacion:
                             ## Reestablecer valres de simulaciones anteriores
                             estado["mostrar_stats"] = False
+                            estado["simulacion_guardada"] = False  # Resetear flag para nueva simulación
                             bits["enviando"] = False
                             bit_reloj["enviando"] = False
                             ciclos_actuales = 0
@@ -423,11 +441,17 @@ def main():
                         estado["tamaño_resultados_objetivo"] = 0.9
                         estado["mostrando_resultados"] = True
 
+                    # Botón Mostrar tabla
+                    if estado.get("mostrar_stats") and estado["boton_tabla_rect"].collidepoint(mouse_pos):
+                        estado["tamaño_tabla_objetivo"] = 0.9
+                        estado["mostrando_tabla"] = True
+
             # Restaurar tamaño de botones cuando se suelta el mouse
             if evento.type == pygame.MOUSEBUTTONUP:
                 estado["tamaño_boton_objetivo"] = 1.0
                 estado["tamaño_parar_objetivo"] = 1.0
                 estado["tamaño_resultados_objetivo"] = 1.0
+                estado["tamaño_tabla_objetivo"] = 1.0
                 estado["tamaño_ff_objetivo"] = 1.0
                 estado["ff_activo"] = False
 
@@ -442,6 +466,9 @@ def main():
 
         diferencia_res = estado["tamaño_resultados_objetivo"] - estado["tamaño_resultados_actual"]
         estado["tamaño_resultados_actual"] += diferencia_res * 0.50
+
+        diferencia_tabla = estado["tamaño_tabla_objetivo"] - estado["tamaño_tabla_actual"]
+        estado["tamaño_tabla_actual"] += diferencia_tabla * 0.50
 
         diferencia_ff = estado["tamaño_ff_objetivo"] - estado["tamaño_ff_actual"]
         estado["tamaño_ff_actual"] += diferencia_ff * 0.50
@@ -520,6 +547,20 @@ def main():
             if simulacion == False:
                 eficiencia_final, tiempo_ocio_final = sim.obtener_estadisticas(tiempo_actual_seg)
                 estado["mostrar_stats"] = True
+                
+                # Guardar datos de la simulación en el historial (solo una vez)
+                if not estado.get("simulacion_guardada", False):
+                    sim_data = {
+                        "simulacion": len(estado["historial_simulaciones"]) + 1,
+                        "latencia": sim.latenciaRAM,
+                        "frecuencia_cpu": sim.frecuenciaCPU,
+                        "tiempo_total": tiempo_actual_seg,
+                        "ocio_total": tiempo_ocio_final,
+                        "ciclos": ciclos_totales,
+                        "eficiencia": eficiencia_final
+                    }
+                    estado["historial_simulaciones"].append(sim_data)
+                    estado["simulacion_guardada"] = True
 
         # Lógica de la Intro
         if estado["intro_activa"]:
@@ -545,7 +586,7 @@ def main():
                     bits["enviando"] = False
 
         # envio de datos reloj
-        if bit_reloj["enviando"]:
+        if bit_reloj["enviando"] and simulacion:
             bit_reloj["estado"] = True
             ##derecha
             if bit_reloj["y_d"] == 230 and bit_reloj["x_d"] < 705:
@@ -576,14 +617,19 @@ def main():
                     bit_reloj["estado"] = False
 
         # C. DIBUJADO (Delegado al módulo graphics)
-        if estado["mostrando_resultados"]:
-            graphics.dibujar_ventana_resultados(pantalla, assets, estado, estado["historial_actividad"])
-        else:
-            graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales, eficiencia=eficiencia_final, tiempo_ocio=tiempo_ocio_final)
+        # Siempre dibujar la simulación de fondo
+        graphics.dibujar_juego(pantalla, assets, estado, bits, bit_reloj, slider_frecuencia, slider_latencia, estado["pc_visual"], tiempo=tiempo_actual_seg, ciclos=ciclos_totales, eficiencia=eficiencia_final, tiempo_ocio=tiempo_ocio_final)
         
         ## Info simulacion solo para pruebas
         if txt_out != None:
             pantalla.blit(txt_out, (150, 550))
+        
+        # Luego dibujar ventanas emergentes encima (al final para que estén sobre todo)
+        if estado["mostrando_resultados"]:
+            graphics.dibujar_ventana_resultados(pantalla, assets, estado, estado["historial_actividad"])
+        elif estado["mostrando_tabla"]:
+            graphics.dibujar_ventana_tabla(pantalla, assets, estado, estado["historial_simulaciones"])
+        
         pygame.display.flip()
 
     pygame.quit()

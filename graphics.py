@@ -82,16 +82,16 @@ def dibujar_juego(pantalla, recursos, estado, bits, bit_reloj, slider_frecuencia
         # Dibujar HUD de estadísticas (Nuevo UI)
         _dibujar_estadisticas(pantalla, recursos, tiempo, ciclos)
 
-        # Dibujar Resultados Finales (Estadísticas y Botón)
-        if estado.get("mostrar_stats", False):
-            _dibujar_resultados_finales(pantalla, recursos, estado, eficiencia, tiempo_ocio)
-
         fuente = pygame.font.SysFont("Montserrat", 20, bold=False)
         # Dibujar sliders si existen (se atenuarán cuando la simulación esté activa)
         if slider_frecuencia and slider_latencia:
             disabled = estado.get("simulacion", False)
             slider_frecuencia.dibujar(pantalla, fuente, disabled=disabled)
             slider_latencia.dibujar(pantalla, fuente, disabled=disabled)
+
+        # Dibujar Resultados Finales (Estadísticas y Botón) - ÚLTIMO para que esté encima
+        if estado.get("mostrar_stats", False):
+            _dibujar_resultados_finales(pantalla, recursos, estado, eficiencia, tiempo_ocio)
 
 
 # --- FUNCIONES PRIVADAS DE DIBUJO (Ayudantes) ---
@@ -372,7 +372,6 @@ def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo
 
     # 4. Botón 'Mostrar más resultados'
     boton_rect = estado["boton_resultados_rect"]
-    # Actualizamos la posición del rect en el estado para que coincida con el dibujo
     boton_rect.topright = (x_derecha, y_actual)
     
     # Animación de escala
@@ -396,10 +395,154 @@ def _dibujar_resultados_finales(superficie, recursos, estado, eficiencia, tiempo
     txt_btn = fuente_btn.render("   Mostrar más resultados   ", True, (255, 255, 255))
     superficie.blit(txt_btn, txt_btn.get_rect(center=rect_anim.center))
 
+    y_actual += 50
+
+    # 5. Botón 'Mostrar tabla'
+    boton_tabla_rect = estado["boton_tabla_rect"]
+    # Actualizamos la posición del rect en el estado para que coincida con el dibujo
+    boton_tabla_rect.topright = (x_derecha, y_actual)
+    
+    # Animación de escala
+    tamaño_tabla = estado.get("tamaño_tabla_actual", 1.0)
+    ancho_tabla_anim = int(boton_tabla_rect.width * tamaño_tabla)
+    alto_tabla_anim = int(boton_tabla_rect.height * tamaño_tabla)
+    
+    rect_tabla_anim = pygame.Rect(0, 0, ancho_tabla_anim, alto_tabla_anim)
+    rect_tabla_anim.center = boton_tabla_rect.center
+
+    # Color e interacción visual
+    color_base_tabla = COLOR_BTN_TABLA  # Azul
+    color_hover_tabla = COLOR_BTN_TABLA_HOVER
+    color_tabla = color_hover_tabla if boton_tabla_rect.collidepoint(mouse_pos) else color_base_tabla
+
+    pygame.draw.rect(superficie, color_tabla, rect_tabla_anim, border_radius=10)
+    
+    # Texto del botón
+    txt_btn_tabla = fuente_btn.render("   Mostrar tabla   ", True, (255, 255, 255))
+    superficie.blit(txt_btn_tabla, txt_btn_tabla.get_rect(center=rect_tabla_anim.center))
+
+
+def dibujar_ventana_tabla(pantalla, recursos, estado, historial_simulaciones):
+    """Dibuja el overlay con la tabla de datos de las simulaciones."""
+    # 1. Fondo semitransparente
+    overlay = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA))
+    overlay.set_alpha(220)
+    overlay.fill((20, 20, 30))
+    pantalla.blit(overlay, (0, 0))
+
+    # 2. Contenedor de la tabla
+    margen_x = 15
+    margen_y = 40
+    ancho_tabla = ANCHO_VENTANA - 2 * margen_x
+    alto_tabla = ALTO_VENTANA - 2 * margen_y
+    
+    rect_tabla = pygame.Rect(margen_x, margen_y, ancho_tabla, alto_tabla)
+    pygame.draw.rect(pantalla, (40, 40, 50), rect_tabla, border_radius=15)
+    pygame.draw.rect(pantalla, (100, 100, 120), rect_tabla, 2, border_radius=15)
+
+    # Título de la tabla
+    fuente_titulo = pygame.font.SysFont("Montserrat", 35, bold=True)
+    txt_titulo = fuente_titulo.render("Historial de Simulaciones", True, (255, 255, 255))
+    pantalla.blit(txt_titulo, txt_titulo.get_rect(center=(ANCHO_VENTANA // 2, margen_y + 15)))
+
+    # Encabezados de columnas - FUENTES MUCHO MAS GRANDES
+    fuente_encabezado = pygame.font.SysFont("Montserrat", 18, bold=True)
+    fuente_datos = pygame.font.SysFont("Montserrat", 17, bold=False)
+    
+    # Definir columnas con ancho fijo - AJUSTADOS
+    columnas = [
+        ("Sim", 65),
+        ("Latencia (s)", 120),
+        ("Frec. (MHz)", 120),
+        ("Tiempo (s)", 120),
+        ("Ocio (s)", 110),
+        ("Ciclos", 100),
+        ("Eficiencia", 115)
+    ]
+    
+    # Dibujar encabezados
+    x_offset = margen_x + 18
+    y_encabezado = margen_y + 52
+    
+    for col_nombre, col_ancho in columnas:
+        txt_col = fuente_encabezado.render(col_nombre, True, (100, 200, 255))
+        pantalla.blit(txt_col, (x_offset, y_encabezado))
+        x_offset += col_ancho
+    
+    # Línea separadora
+    pygame.draw.line(pantalla, (100, 100, 120), (margen_x + 12, y_encabezado + 35), 
+                     (margen_x + ancho_tabla - 12, y_encabezado + 35), 4)
+
+    # Dibujar filas de datos
+    y_fila = y_encabezado + 50
+    fila_alto = 40
+    max_filas = (alto_tabla - 160) // fila_alto
+    
+    # Si no hay historial, mostrar mensaje
+    if not historial_simulaciones or len(historial_simulaciones) == 0:
+        txt_vacio = pygame.font.SysFont("Montserrat", 20, bold=False).render(
+            "No hay datos de simulaciones aun.", True, (150, 150, 150))
+        pantalla.blit(txt_vacio, txt_vacio.get_rect(center=(ANCHO_VENTANA // 2, margen_y + alto_tabla // 2)))
+    else:
+        # Mostrar últimas simulaciones (hasta max_filas)
+        for idx, sim_data in enumerate(historial_simulaciones[-max_filas:]):
+            # Dibujar fondo alterno
+            if idx % 2 == 0:
+                pygame.draw.rect(pantalla, (55, 55, 75), 
+                               (margen_x + 10, y_fila - 2, ancho_tabla - 20, fila_alto))
+            
+            try:
+                # Preparar datos
+                num_sim = str(sim_data.get("simulacion", idx + 1))
+                latencia = f"{float(sim_data.get('latencia', 0)):.4f}"
+                frec_cpu = f"{float(sim_data.get('frecuencia_cpu', 0)):.1f}"
+                tiempo_total = f"{float(sim_data.get('tiempo_total', 0)):.2f}"
+                ocio_total = f"{float(sim_data.get('ocio_total', 0)):.2f}"
+                ciclos = str(int(float(sim_data.get('ciclos', 0))))
+                eficiencia = f"{float(sim_data.get('eficiencia', 0)):.1f}"
+                
+                valores = [num_sim, latencia, frec_cpu, tiempo_total, ocio_total, ciclos, eficiencia]
+                
+                # Dibujar cada valor en su columna
+                x_col = margen_x + 18
+                for i, (valor, (col_nombre, col_ancho)) in enumerate(zip(valores, columnas)):
+                    # Color según columna
+                    if i == 6:  # Eficiencia en cian
+                        color = (0, 255, 255)
+                    elif i == 4:  # Ocio total en rosa
+                        color = (255, 20, 147)
+                    else:
+                        color = (245, 245, 245)
+                    
+                    txt_valor = fuente_datos.render(valor, True, color)
+                    pantalla.blit(txt_valor, (x_col, y_fila + 5))
+                    x_col += col_ancho
+                
+                y_fila += fila_alto
+            except Exception as e:
+                # Si hay error al procesar una fila, mostrar mensaje de error
+                txt_error = fuente_datos.render(f"Error: {str(e)[:30]}", True, (255, 100, 100))
+                pantalla.blit(txt_error, (margen_x + 18, y_fila + 5))
+                y_fila += fila_alto
+
+    # 4. Botón Cerrar
+    rect_cerrar = estado["boton_cerrar_tabla_rect"]
+    rect_cerrar.width = 160
+    rect_cerrar.height = 50
+    rect_cerrar.center = (ANCHO_VENTANA // 2, margen_y + alto_tabla - 18)
+    
+    mouse_pos = pygame.mouse.get_pos()
+    color_cerrar = (200, 50, 50) if rect_cerrar.collidepoint(mouse_pos) else (150, 30, 30)
+    
+    pygame.draw.rect(pantalla, color_cerrar, rect_cerrar, border_radius=10)
+    pygame.draw.rect(pantalla, (255, 255, 255), rect_cerrar, 2, border_radius=10)
+    
+    txt_cerrar = pygame.font.SysFont("Montserrat", 18, bold=True).render("CERRAR", True, (255, 255, 255))
+    pantalla.blit(txt_cerrar, txt_cerrar.get_rect(center=rect_cerrar.center))
+
 
 def dibujar_ventana_resultados(pantalla, recursos, estado, historial):
     """Dibuja el overlay con la gráfica de rendimiento."""
-    # 1. Fondo semitransparente
     overlay = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA))
     overlay.set_alpha(220)
     overlay.fill((20, 20, 30))
@@ -497,8 +640,6 @@ def _dibujar_efectos_cpu(superficie, estado, frecuencia):
         # Usar BLEND_ADD para efecto de luz/brillo
         superficie.blit(surf_calor, rect_calor, special_flags=pygame.BLEND_ADD)
 
-
-# hacer brillar el texto de output 
 
 def texto_neon(font, text, color_nucleo, color_luz, radius=10):
     # 1. Renderizar el texto base (del color de la luz)
